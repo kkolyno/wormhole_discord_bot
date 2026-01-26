@@ -21,6 +21,7 @@ const CONFIG = {
   // Optional
   pingRoleId: process.env.PING_ROLE_ID || null,
   emptyGraceSeconds: parseInt(process.env.EMPTY_GRACE_SECONDS, 10) || 90,
+  joinGraceSeconds: parseInt(process.env.JOIN_GRACE_SECONDS, 10) || 15,
   notesbotStartCommand: process.env.NOTESBOT_START_COMMAND || '/join',
   notesbotStopCommand: process.env.NOTESBOT_STOP_COMMAND || '/leave',
   notesStartHint: process.env.NOTES_START_HINT || null,
@@ -61,6 +62,7 @@ const SessionState = {
 
 let sessionState = SessionState.INACTIVE;
 let graceTimer = null;
+let joinGraceTimer = null;
 let currentPromptMessageId = null;
 
 // ============================================================================
@@ -222,6 +224,16 @@ function clearGraceTimer() {
 }
 
 /**
+ * Clear the join grace timer if active
+ */
+function clearJoinGraceTimer() {
+  if (joinGraceTimer) {
+    clearTimeout(joinGraceTimer);
+    joinGraceTimer = null;
+  }
+}
+
+/**
  * Start the empty grace timer
  */
 function startGraceTimer() {
@@ -245,6 +257,30 @@ function startGraceTimer() {
   console.log(`Started grace timer (${CONFIG.emptyGraceSeconds}s)`);
 }
 
+/**
+ * Start the join grace timer - waits before posting prompt to avoid accidental joins
+ */
+function startJoinGraceTimer() {
+  clearJoinGraceTimer();
+
+  joinGraceTimer = setTimeout(async () => {
+    joinGraceTimer = null;
+
+    const voiceChannel = await getTargetVoiceChannel();
+    const humanCount = getHumanCount(voiceChannel);
+
+    if (humanCount > 0 && sessionState === SessionState.INACTIVE) {
+      console.log('Join grace period expired with humans present - posting prompt');
+      sessionState = SessionState.PROMPTED;
+      await postMeetingPrompt();
+    } else {
+      console.log('Join grace period expired but no humans - staying Inactive');
+    }
+  }, CONFIG.joinGraceSeconds * 1000);
+
+  console.log(`Started join grace timer (${CONFIG.joinGraceSeconds}s)`);
+}
+
 // ============================================================================
 // Event Handlers
 // ============================================================================
@@ -256,6 +292,7 @@ client.once(Events.ClientReady, async (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}`);
   console.log(`Monitoring voice channel: ${CONFIG.voiceChannelId}`);
   console.log(`Posting prompts to: ${CONFIG.notesTextChannelId}`);
+  console.log(`Join grace period: ${CONFIG.joinGraceSeconds}s`);
   console.log(`Empty grace period: ${CONFIG.emptyGraceSeconds}s`);
 
   // Check if there are already humans in the voice channel
@@ -295,16 +332,19 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
   if (humanCount > 0) {
     clearGraceTimer();
 
-    if (sessionState === SessionState.INACTIVE) {
-      console.log('Transition: Inactive -> Prompted (humans joined)');
-      sessionState = SessionState.PROMPTED;
-      await postMeetingPrompt();
+    if (sessionState === SessionState.INACTIVE && !joinGraceTimer) {
+      console.log('Human joined - starting join grace timer');
+      startJoinGraceTimer();
     }
   } else {
     // humanCount === 0
+    clearJoinGraceTimer();
+
     if (sessionState === SessionState.PROMPTED && !graceTimer) {
       console.log('All humans left - starting grace timer');
       startGraceTimer();
+    } else if (sessionState === SessionState.INACTIVE) {
+      console.log('All humans left while inactive - no action needed');
     }
   }
 });
