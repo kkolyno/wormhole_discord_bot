@@ -8,6 +8,9 @@ A Discord bot that detects when people join a voice channel and prompts for meet
 - 📋 **One-Click Prompts** - Posts a "Meeting detected" message with Start/No buttons
 - 🤖 **NotesBot Integration** - Guides users to run NotesBot commands (`/join` and `/leave`)
 - 🔄 **Anti-Spam Protection** - Grace timer prevents duplicate prompts during brief disconnects
+- 📝 **Discord Logging** - Optional log channel for monitoring bot activity and errors
+- 🛡️ **Graceful Failure** - Robust error handling keeps the bot running even when issues occur
+- 🔌 **Restart Recovery** - Detects users already in voice channel on bot restart
 - 🐳 **Docker-First** - No filesystem mounts needed, runs entirely from environment variables
 
 ## Quick Start (Portainer)
@@ -32,7 +35,9 @@ A Discord bot that detects when people join a voice channel and prompts for meet
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PING_ROLE_ID` | - | Role ID to mention in prompts |
+| `LOG_CHANNEL_ID` | - | Text channel ID for bot logs (errors, status updates) |
 | `EMPTY_GRACE_SECONDS` | `90` | Seconds to wait before resetting after channel empties |
+| `JOIN_GRACE_SECONDS` | `15` | Seconds to wait after first join before posting prompt |
 | `NOTESBOT_START_COMMAND` | `/join` | Command to start NotesBot recording |
 | `NOTESBOT_STOP_COMMAND` | `/leave` | Command to stop NotesBot and generate notes |
 | `NOTES_START_HINT` | - | Custom message for "notes started" follow-up |
@@ -88,7 +93,9 @@ services:
       - NOTES_TEXT_CHANNEL_ID=123456789012345678
       # Optional
       - PING_ROLE_ID=123456789012345678
+      - LOG_CHANNEL_ID=123456789012345678
       - EMPTY_GRACE_SECONDS=90
+      - JOIN_GRACE_SECONDS=15
       # - NOTESBOT_START_COMMAND=/join
       # - NOTESBOT_STOP_COMMAND=/leave
 ```

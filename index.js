@@ -8,6 +8,7 @@ const {
   SlashCommandBuilder,
   REST,
   Routes,
+  MessageFlags,
 } = require('discord.js');
 
 // ============================================================================
@@ -24,6 +25,7 @@ const CONFIG = {
 
   // Optional
   pingRoleId: process.env.PING_ROLE_ID || null,
+  logChannelId: process.env.LOG_CHANNEL_ID || null,
   emptyGraceSeconds: parseInt(process.env.EMPTY_GRACE_SECONDS, 10) || 90,
   joinGraceSeconds: parseInt(process.env.JOIN_GRACE_SECONDS, 10) || 15,
   notesbotStartCommand: process.env.NOTESBOT_START_COMMAND || '/join',
@@ -57,12 +59,99 @@ function validateConfig() {
 }
 
 // ============================================================================
+// Logger Utility
+// ============================================================================
+
+const LogLevel = {
+  DEBUG: 'DEBUG',
+  INFO: 'INFO',
+  WARN: 'WARN',
+  ERROR: 'ERROR',
+};
+
+/**
+ * Logger that outputs to console and optionally to a Discord channel
+ */
+const logger = {
+  logChannel: null,
+
+  async init() {
+    if (!CONFIG.logChannelId) return;
+    try {
+      const guild = await client.guilds.fetch(CONFIG.guildId);
+      this.logChannel = await guild.channels.fetch(CONFIG.logChannelId);
+      this.info('Log channel initialized');
+    } catch (error) {
+      console.error('Failed to initialize log channel:', error.message);
+    }
+  },
+
+  async _log(level, message, error = null) {
+    const timestamp = new Date().toISOString();
+    const consoleMsg = `[${timestamp}] [${level}] ${message}${error ? `: ${error.message}` : ''}`;
+    
+    // Always log to console
+    if (level === LogLevel.ERROR) {
+      console.error(consoleMsg);
+    } else if (level === LogLevel.WARN) {
+      console.warn(consoleMsg);
+    } else {
+      console.log(consoleMsg);
+    }
+
+    // Log to Discord channel if available
+    if (this.logChannel) {
+      try {
+        const emoji = {
+          [LogLevel.DEBUG]: '🔍',
+          [LogLevel.INFO]: 'ℹ️',
+          [LogLevel.WARN]: '⚠️',
+          [LogLevel.ERROR]: '❌',
+        }[level];
+        
+        let discordMsg = `${emoji} **[${level}]** ${message}`;
+        if (error) {
+          discordMsg += `\n\`\`\`${error.stack || error.message}\`\`\``;
+        }
+        
+        // Truncate if too long
+        if (discordMsg.length > 2000) {
+          discordMsg = discordMsg.substring(0, 1997) + '...';
+        }
+        
+        await this.logChannel.send(discordMsg);
+      } catch (err) {
+        console.error('Failed to send log to Discord:', err.message);
+      }
+    }
+  },
+
+  debug(message) { this._log(LogLevel.DEBUG, message); },
+  info(message) { this._log(LogLevel.INFO, message); },
+  warn(message, error = null) { this._log(LogLevel.WARN, message, error); },
+  error(message, error = null) { this._log(LogLevel.ERROR, message, error); },
+};
+
+/**
+ * Safely execute an async operation with error handling
+ */
+async function safeExecute(operation, context, fallback = null) {
+  try {
+    return await operation();
+  } catch (error) {
+    logger.error(`Error in ${context}`, error);
+    return fallback;
+  }
+}
+
+// ============================================================================
 // Session State Machine
 // ============================================================================
 
 const SessionState = {
   INACTIVE: 'inactive',
   PROMPTED: 'prompted',
+  WAITING: 'waiting',
 };
 
 let sessionState = SessionState.INACTIVE;
@@ -88,13 +177,13 @@ async function registerCommands() {
   const rest = new REST({ version: '10' }).setToken(CONFIG.token);
 
   try {
-    console.log('Registering slash commands...');
+    logger.info('Registering slash commands...');
     await rest.put(Routes.applicationGuildCommands(CONFIG.clientId, CONFIG.guildId), {
       body: commands.map((cmd) => cmd.toJSON()),
     });
-    console.log('Slash commands registered successfully');
+    logger.info('Slash commands registered successfully');
   } catch (error) {
-    console.error('Error registering slash commands:', error.message);
+    logger.error('Error registering slash commands', error);
   }
 }
 
@@ -119,6 +208,15 @@ function getHumanCount(voiceChannel) {
 }
 
 /**
+ * Get mentions for all human members in the voice channel
+ */
+function getVoiceChannelMentions(voiceChannel) {
+  if (!voiceChannel || !voiceChannel.members) return '';
+  const humans = voiceChannel.members.filter((member) => !member.user.bot);
+  return humans.map((member) => `<@${member.user.id}>`).join(' ');
+}
+
+/**
  * Get the target voice channel
  */
 async function getTargetVoiceChannel() {
@@ -127,7 +225,7 @@ async function getTargetVoiceChannel() {
     const channel = await guild.channels.fetch(CONFIG.voiceChannelId);
     return channel;
   } catch (error) {
-    console.error('Error fetching voice channel:', error.message);
+    logger.error('Error fetching voice channel', error);
     return null;
   }
 }
@@ -141,7 +239,7 @@ async function getNotesTextChannel() {
     const channel = await guild.channels.fetch(CONFIG.notesTextChannelId);
     return channel;
   } catch (error) {
-    console.error('Error fetching notes text channel:', error.message);
+    logger.error('Error fetching notes text channel', error);
     return null;
   }
 }
@@ -149,8 +247,8 @@ async function getNotesTextChannel() {
 /**
  * Create the prompt buttons
  */
-function createPromptButtons(disabled = false) {
-  return new ActionRowBuilder().addComponents(
+function createPromptButtons(disabled = false, showWait = true) {
+  const buttons = [
     new ButtonBuilder()
       .setCustomId('start_notes')
       .setLabel('Start Notes')
@@ -160,16 +258,30 @@ function createPromptButtons(disabled = false) {
       .setCustomId('no_notes')
       .setLabel('No')
       .setStyle(ButtonStyle.Secondary)
-      .setDisabled(disabled)
-  );
+      .setDisabled(disabled),
+  ];
+  
+  if (showWait) {
+    buttons.push(
+      new ButtonBuilder()
+        .setCustomId('wait_for_more')
+        .setLabel('Wait for More')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(disabled)
+    );
+  }
+  
+  return new ActionRowBuilder().addComponents(buttons);
 }
 
 /**
- * Build the prompt message content
+ * Build the prompt message content with voice channel member mentions
  */
-function buildPromptContent() {
+function buildPromptContent(voiceChannel) {
+  const mentions = getVoiceChannelMentions(voiceChannel);
+  
   if (CONFIG.promptText) {
-    return CONFIG.promptText;
+    return mentions ? `${mentions}\n\n${CONFIG.promptText}` : CONFIG.promptText;
   }
 
   let content = `📋 **Meeting detected** in <#${CONFIG.voiceChannelId}>!\n\n`;
@@ -178,6 +290,10 @@ function buildPromptContent() {
 
   if (CONFIG.pingRoleId) {
     content = `<@&${CONFIG.pingRoleId}>\n\n` + content;
+  }
+  
+  if (mentions) {
+    content = `${mentions}\n\n` + content;
   }
 
   return content;
@@ -211,19 +327,21 @@ function buildNotesStartedMessage() {
 async function postMeetingPrompt() {
   const textChannel = await getNotesTextChannel();
   if (!textChannel) {
-    console.error('Cannot post prompt: notes text channel not found');
+    logger.error('Cannot post prompt: notes text channel not found');
     return;
   }
 
+  const voiceChannel = await getTargetVoiceChannel();
+
   try {
     const message = await textChannel.send({
-      content: buildPromptContent(),
-      components: [createPromptButtons(false)],
+      content: buildPromptContent(voiceChannel),
+      components: [createPromptButtons(false, true)],
     });
     currentPromptMessageId = message.id;
-    console.log(`Posted meeting prompt (message ID: ${message.id})`);
+    logger.info(`Posted meeting prompt (message ID: ${message.id})`);
   } catch (error) {
-    console.error('Error posting meeting prompt:', error.message);
+    logger.error('Error posting meeting prompt', error);
   }
 }
 
@@ -242,7 +360,7 @@ async function disablePromptButtons() {
       components: [createPromptButtons(true)],
     });
   } catch (error) {
-    console.error('Error disabling prompt buttons:', error.message);
+    logger.warn('Error disabling prompt buttons (message may have been deleted)', error);
   }
 }
 
@@ -279,15 +397,15 @@ function startGraceTimer() {
     const humanCount = getHumanCount(voiceChannel);
 
     if (humanCount === 0) {
-      console.log('Grace period expired with no humans - resetting to Inactive');
+      logger.info('Grace period expired with no humans - resetting to Inactive');
       sessionState = SessionState.INACTIVE;
       currentPromptMessageId = null;
     } else {
-      console.log('Grace period expired but humans are present - staying Prompted');
+      logger.info('Grace period expired but humans are present - staying Prompted');
     }
   }, CONFIG.emptyGraceSeconds * 1000);
 
-  console.log(`Started grace timer (${CONFIG.emptyGraceSeconds}s)`);
+  logger.debug(`Started grace timer (${CONFIG.emptyGraceSeconds}s)`);
 }
 
 /**
@@ -303,15 +421,15 @@ function startJoinGraceTimer() {
     const humanCount = getHumanCount(voiceChannel);
 
     if (humanCount > 0 && sessionState === SessionState.INACTIVE) {
-      console.log('Join grace period expired with humans present - posting prompt');
+      logger.info('Join grace period expired with humans present - posting prompt');
       sessionState = SessionState.PROMPTED;
       await postMeetingPrompt();
     } else {
-      console.log('Join grace period expired but no humans - staying Inactive');
+      logger.debug('Join grace period expired but no humans - staying Inactive');
     }
   }, CONFIG.joinGraceSeconds * 1000);
 
-  console.log(`Started join grace timer (${CONFIG.joinGraceSeconds}s)`);
+  logger.debug(`Started join grace timer (${CONFIG.joinGraceSeconds}s)`);
 }
 
 // ============================================================================
@@ -322,158 +440,274 @@ function startJoinGraceTimer() {
  * Handle bot ready event
  */
 client.once(Events.ClientReady, async (readyClient) => {
-  console.log(`Logged in as ${readyClient.user.tag}`);
-  console.log(`Monitoring voice channel: ${CONFIG.voiceChannelId}`);
-  console.log(`Posting prompts to: ${CONFIG.notesTextChannelId}`);
-  console.log(`Join grace period: ${CONFIG.joinGraceSeconds}s`);
-  console.log(`Empty grace period: ${CONFIG.emptyGraceSeconds}s`);
+  logger.info(`Logged in as ${readyClient.user.tag}`);
+  
+  // Initialize log channel first
+  await logger.init();
+  
+  logger.info(`Monitoring voice channel: ${CONFIG.voiceChannelId}`);
+  logger.info(`Posting prompts to: ${CONFIG.notesTextChannelId}`);
+  logger.info(`Join grace period: ${CONFIG.joinGraceSeconds}s`);
+  logger.info(`Empty grace period: ${CONFIG.emptyGraceSeconds}s`);
 
   // Register slash commands
   await registerCommands();
 
-  // Check if there are already humans in the voice channel
-  const voiceChannel = await getTargetVoiceChannel();
-  const humanCount = getHumanCount(voiceChannel);
+  // Check if there are already humans in the voice channel (handles restart scenario)
+  await safeExecute(async () => {
+    const voiceChannel = await getTargetVoiceChannel();
+    const humanCount = getHumanCount(voiceChannel);
 
-  if (humanCount > 0 && sessionState === SessionState.INACTIVE) {
-    console.log(`Startup: Found ${humanCount} human(s) in voice channel - posting prompt`);
-    sessionState = SessionState.PROMPTED;
-    await postMeetingPrompt();
-  } else {
-    console.log(`Startup: No humans in voice channel (count: ${humanCount})`);
-  }
+    if (humanCount > 0 && sessionState === SessionState.INACTIVE) {
+      logger.info(`Startup: Found ${humanCount} human(s) already in voice channel - posting prompt`);
+      sessionState = SessionState.PROMPTED;
+      await postMeetingPrompt();
+    } else {
+      logger.info(`Startup: No humans in voice channel (count: ${humanCount})`);
+    }
+  }, 'startup voice channel check');
 });
 
 /**
  * Handle voice state updates
  */
 client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
-  // Check if this update involves our target voice channel
-  const targetChannelId = CONFIG.voiceChannelId;
-  const wasInTarget = oldState.channelId === targetChannelId;
-  const isInTarget = newState.channelId === targetChannelId;
+  await safeExecute(async () => {
+    // Check if this update involves our target voice channel
+    const targetChannelId = CONFIG.voiceChannelId;
+    const wasInTarget = oldState.channelId === targetChannelId;
+    const isInTarget = newState.channelId === targetChannelId;
 
-  // Ignore if neither old nor new state involves our channel
-  if (!wasInTarget && !isInTarget) return;
+    // Ignore if neither old nor new state involves our channel
+    if (!wasInTarget && !isInTarget) return;
 
-  // Ignore bot users
-  if (newState.member?.user?.bot) return;
+    // Ignore bot users
+    if (newState.member?.user?.bot) return;
 
-  const voiceChannel = await getTargetVoiceChannel();
-  const humanCount = getHumanCount(voiceChannel);
+    const voiceChannel = await getTargetVoiceChannel();
+    const humanCount = getHumanCount(voiceChannel);
+    
+    // Check if someone joined (not just moved or left)
+    const isJoin = !wasInTarget && isInTarget;
 
-  console.log(`Voice update: ${humanCount} human(s) in channel, state: ${sessionState}`);
+    logger.debug(`Voice update: ${humanCount} human(s) in channel, state: ${sessionState}, isJoin: ${isJoin}`);
 
-  // Handle transitions
-  if (humanCount > 0) {
-    clearGraceTimer();
+    // Handle transitions
+    if (humanCount > 0) {
+      clearGraceTimer();
 
-    if (sessionState === SessionState.INACTIVE && !joinGraceTimer) {
-      console.log('Human joined - starting join grace timer');
-      startJoinGraceTimer();
+      if (sessionState === SessionState.INACTIVE && !joinGraceTimer) {
+        logger.info('Human joined - starting join grace timer');
+        startJoinGraceTimer();
+      } else if (sessionState === SessionState.WAITING && isJoin) {
+        // Someone new joined while waiting - re-post the prompt
+        logger.info('New human joined while waiting - re-posting prompt');
+        sessionState = SessionState.PROMPTED;
+        await postMeetingPrompt();
+      }
+    } else {
+      // humanCount === 0
+      clearJoinGraceTimer();
+
+      if ((sessionState === SessionState.PROMPTED || sessionState === SessionState.WAITING) && !graceTimer) {
+        logger.info('All humans left - starting grace timer');
+        startGraceTimer();
+      } else if (sessionState === SessionState.INACTIVE) {
+        logger.debug('All humans left while inactive - no action needed');
+      }
     }
-  } else {
-    // humanCount === 0
-    clearJoinGraceTimer();
-
-    if (sessionState === SessionState.PROMPTED && !graceTimer) {
-      console.log('All humans left - starting grace timer');
-      startGraceTimer();
-    } else if (sessionState === SessionState.INACTIVE) {
-      console.log('All humans left while inactive - no action needed');
-    }
-  }
+  }, 'voice state update');
 });
 
 /**
  * Handle button and slash command interactions
  */
 client.on(Events.InteractionCreate, async (interaction) => {
-  // Handle slash commands
-  if (interaction.isChatInputCommand()) {
-    const { commandName } = interaction;
+  await safeExecute(async () => {
+    // Handle slash commands
+    if (interaction.isChatInputCommand()) {
+      const { commandName } = interaction;
 
-    if (commandName === 'ping') {
-      const latency = Date.now() - interaction.createdTimestamp;
-      await interaction.reply(`🏓 Pong! Latency: ${latency}ms | WebSocket: ${client.ws.ping}ms`);
-    } else if (commandName === 'status') {
-      const uptime = Math.floor((Date.now() - botStartTime) / 1000);
-      const hours = Math.floor(uptime / 3600);
-      const minutes = Math.floor((uptime % 3600) / 60);
-      const seconds = uptime % 60;
+      if (commandName === 'ping') {
+        const latency = Date.now() - interaction.createdTimestamp;
+        await interaction.reply(`🏓 Pong! Latency: ${latency}ms | WebSocket: ${client.ws.ping}ms`);
+      } else if (commandName === 'status') {
+        const uptime = Math.floor((Date.now() - botStartTime) / 1000);
+        const hours = Math.floor(uptime / 3600);
+        const minutes = Math.floor((uptime % 3600) / 60);
+        const seconds = uptime % 60;
 
-      const voiceChannel = await getTargetVoiceChannel();
-      const humanCount = getHumanCount(voiceChannel);
+        const voiceChannel = await getTargetVoiceChannel();
+        const humanCount = getHumanCount(voiceChannel);
 
-      let statusMsg = `📊 **Bot Status**\n`;
-      statusMsg += `> **State:** ${sessionState}\n`;
-      statusMsg += `> **Uptime:** ${hours}h ${minutes}m ${seconds}s\n`;
-      statusMsg += `> **Humans in VC:** ${humanCount}\n`;
-      statusMsg += `> **Join Grace Timer:** ${joinGraceTimer ? 'Active' : 'Inactive'}\n`;
-      statusMsg += `> **Empty Grace Timer:** ${graceTimer ? 'Active' : 'Inactive'}`;
+        let statusMsg = `📊 **Bot Status**\n`;
+        statusMsg += `> **State:** ${sessionState}\n`;
+        statusMsg += `> **Uptime:** ${hours}h ${minutes}m ${seconds}s\n`;
+        statusMsg += `> **Humans in VC:** ${humanCount}\n`;
+        statusMsg += `> **Join Grace Timer:** ${joinGraceTimer ? 'Active' : 'Inactive'}\n`;
+        statusMsg += `> **Empty Grace Timer:** ${graceTimer ? 'Active' : 'Inactive'}`;
 
-      await interaction.reply(statusMsg);
+        await interaction.reply(statusMsg);
+      }
+      return;
     }
-    return;
-  }
 
-  // Handle button interactions
-  if (!interaction.isButton()) return;
+    // Handle button interactions
+    if (!interaction.isButton()) return;
 
-  const { customId } = interaction;
+    const { customId } = interaction;
 
-  if (customId === 'start_notes') {
-    try {
-      // Disable buttons
-      await disablePromptButtons();
+    // Helper to safely reply to interaction
+    const safeReply = async (options) => {
+      if (interaction.replied || interaction.deferred) {
+        return interaction.followUp(options);
+      }
+      return interaction.reply(options);
+    };
 
-      // Send follow-up message
-      await interaction.reply({
-        content: buildNotesStartedMessage(),
-      });
-
-      console.log('User clicked Start Notes - instructions posted');
-    } catch (error) {
-      console.error('Error handling Start Notes button:', error.message);
+    if (customId === 'start_notes') {
       try {
-        await interaction.reply({
-          content: '❌ An error occurred. Please run the NotesBot commands manually.',
-          ephemeral: true,
+        // Disable buttons first
+        await disablePromptButtons();
+
+        // Send follow-up message
+        await safeReply({
+          content: buildNotesStartedMessage(),
         });
-      } catch (e) {
-        // Interaction may have already been handled
+
+        logger.info('User clicked Start Notes - instructions posted');
+      } catch (error) {
+        logger.error('Error handling Start Notes button', error);
+        try {
+          await safeReply({
+            content: '❌ An error occurred. Please run the NotesBot commands manually.',
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch (e) {
+          // Interaction may have already been handled
+        }
+      }
+    } else if (customId === 'no_notes') {
+      try {
+        // Disable buttons first
+        await disablePromptButtons();
+
+        // Acknowledge
+        await safeReply({
+          content: '👍 Okay, not starting notes for this session.',
+        });
+
+        logger.info('User clicked No - session continues without notes');
+      } catch (error) {
+        logger.error('Error handling No button', error);
+        try {
+          await safeReply({
+            content: 'Acknowledged.',
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch (e) {
+          // Interaction may have already been handled
+        }
+      }
+    } else if (customId === 'wait_for_more') {
+      try {
+        sessionState = SessionState.WAITING;
+        
+        // Update the message to show waiting status
+        const textChannel = await getNotesTextChannel();
+        if (textChannel && currentPromptMessageId) {
+          const message = await textChannel.messages.fetch(currentPromptMessageId);
+          const voiceChannel = await getTargetVoiceChannel();
+          const humanCount = getHumanCount(voiceChannel);
+          
+          let waitContent = `⏳ **Waiting for more people to join...**\n\n`;
+          waitContent += `Currently **${humanCount}** person(s) in <#${CONFIG.voiceChannelId}>.\n`;
+          waitContent += `The prompt will reappear when someone new joins.`;
+          
+          await message.edit({
+            content: waitContent,
+            components: [createPromptButtons(true, false)],
+          });
+        }
+        
+        await safeReply({
+          content: '⏳ Waiting for more people. The prompt will reappear when someone joins.',
+          flags: MessageFlags.Ephemeral,
+        });
+        
+        logger.info('User clicked Wait for More - waiting for new joins');
+      } catch (error) {
+        logger.error('Error handling Wait for More button', error);
+        try {
+          await safeReply({
+            content: '❌ An error occurred.',
+            flags: MessageFlags.Ephemeral,
+          });
+        } catch (e) {
+          // Interaction may have already been handled
+        }
       }
     }
-  } else if (customId === 'no_notes') {
-    try {
-      // Disable buttons
-      await disablePromptButtons();
-
-      // Acknowledge
-      await interaction.reply({
-        content: '👍 Okay, not starting notes for this session.',
-      });
-
-      console.log('User clicked No - session continues without notes');
-    } catch (error) {
-      console.error('Error handling No button:', error.message);
-      try {
-        await interaction.reply({
-          content: 'Acknowledged.',
-          ephemeral: true,
-        });
-      } catch (e) {
-        // Interaction may have already been handled
-      }
-    }
-  }
+  }, 'interaction handling');
 });
 
 /**
- * Handle errors
+ * Handle Discord client errors
  */
 client.on(Events.Error, (error) => {
-  console.error('Discord client error:', error.message);
+  logger.error('Discord client error', error);
+});
+
+/**
+ * Handle shard errors
+ */
+client.on(Events.ShardError, (error, shardId) => {
+  logger.error(`Shard ${shardId} error`, error);
+});
+
+/**
+ * Handle disconnects
+ */
+client.on(Events.ShardDisconnect, (event, shardId) => {
+  logger.warn(`Shard ${shardId} disconnected (code: ${event.code})`);
+});
+
+/**
+ * Handle reconnects
+ */
+client.on(Events.ShardReconnecting, (shardId) => {
+  logger.info(`Shard ${shardId} reconnecting...`);
+});
+
+// ============================================================================
+// Global Error Handlers
+// ============================================================================
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Promise Rejection', reason instanceof Error ? reason : new Error(String(reason)));
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception', error);
+  // Give time for the log to be sent to Discord
+  setTimeout(() => process.exit(1), 1000);
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  logger.info('Received SIGINT - shutting down gracefully');
+  clearGraceTimer();
+  clearJoinGraceTimer();
+  client.destroy();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  logger.info('Received SIGTERM - shutting down gracefully');
+  clearGraceTimer();
+  clearJoinGraceTimer();
+  client.destroy();
+  process.exit(0);
 });
 
 // ============================================================================
@@ -482,4 +716,7 @@ client.on(Events.Error, (error) => {
 
 validateConfig();
 console.log('Starting Meeting Helper Bot...');
-client.login(CONFIG.token);
+client.login(CONFIG.token).catch((error) => {
+  console.error('Failed to login:', error.message);
+  process.exit(1);
+});
