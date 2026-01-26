@@ -1,0 +1,14 @@
+services:
+  meeting-helper-bot:
+    build:
+      context: .
+      platform: linux/arm64
+    platform: linux/arm64
+    container_name: meeting-helper-bot
+    restart: unless-stopped
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - GUILD_ID=${GUILD_ID}
+      - VOICE_CHANNEL_ID=${VOICE_CHANNEL_ID}
+      - NOTES_TEXT_CHANNEL_ID=${NOTES_TEXT_CHANNEL_ID}
+      - EMPTY_GRACE_SECONDS=${EMPTY_GRACE_SECONDS:-90}
