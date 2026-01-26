@@ -1,0 +1,25 @@
+# Git
+.git
+.gitignore
+
+# GitHub
+.github
+
+# Dependencies (will be installed in container)
+node_modules
+
+# Environment files
+.env
+.env.*
+
+# Documentation
+README.md
+LICENSE
+
+# IDE
+.idea
+.vscode
+
+# Logs
+*.log
+logs/
