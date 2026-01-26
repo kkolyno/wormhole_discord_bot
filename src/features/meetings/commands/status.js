@@ -1,11 +1,11 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { getState, getBotStartTime, isTimerActive } = require('../state/session');
-const { getTargetVoiceChannel, getHumanCount } = require('../utils/helpers');
+const { getState, getBotStartTime, isTimerActive, getTargetVoiceChannel } = require('../state');
+const { getHumanCount } = require('../../../utils/discord');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('status')
-    .setDescription('Get the current bot status'),
+    .setName('meeting-status')
+    .setDescription('Get the current meeting tracking status'),
 
   async execute(interaction) {
     const uptime = Math.floor((Date.now() - getBotStartTime()) / 1000);
@@ -16,7 +16,7 @@ module.exports = {
     const voiceChannel = await getTargetVoiceChannel();
     const humanCount = getHumanCount(voiceChannel);
 
-    let statusMsg = `📊 **Bot Status**\n`;
+    let statusMsg = `📊 **Meeting Status**\n`;
     statusMsg += `> **State:** ${getState()}\n`;
     statusMsg += `> **Uptime:** ${hours}h ${minutes}m ${seconds}s\n`;
     statusMsg += `> **Humans in VC:** ${humanCount}\n`;

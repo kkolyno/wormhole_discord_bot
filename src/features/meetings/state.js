@@ -1,12 +1,10 @@
-const { CONFIG } = require('../config');
-const { logger } = require('../utils/logger');
+const { logger } = require('../../core/logger');
+const { fetchChannel, getHumanCount } = require('../../utils/discord');
+const { MEETINGS_CONFIG } = require('./config');
 const {
-  getTargetVoiceChannel,
-  getAlertsChannel,
-  getHumanCount,
   createPromptButtons,
   buildPromptContent,
-} = require('../utils/helpers');
+} = require('./helpers');
 
 const SessionState = {
   INACTIVE: 'inactive',
@@ -143,6 +141,15 @@ function isTimerActive(name) {
   return timers[name] !== null;
 }
 
+// Helper functions for channels
+async function getTargetVoiceChannel() {
+  return fetchChannel(MEETINGS_CONFIG.voiceChannelId);
+}
+
+async function getAlertsChannel() {
+  return fetchChannel(MEETINGS_CONFIG.alertsChannelId);
+}
+
 async function postMeetingPrompt() {
   const alertsChannel = await getAlertsChannel();
   if (!alertsChannel) {
@@ -254,7 +261,7 @@ function startGraceTimer() {
           let reminderMsg = `${attendeeMentions}\n\n`;
           reminderMsg += `⏹️ **Meeting ended** - All attendees have left the voice channel.\n\n`;
           reminderMsg += `**Stop the recording now:**\n`;
-          reminderMsg += `> Run \`${CONFIG.notesbotStopCommand}\` to stop recording and generate meeting notes.`;
+          reminderMsg += `> Run \`${MEETINGS_CONFIG.notesbotStopCommand}\` to stop recording and generate meeting notes.`;
           
           try {
             await alertsChannel.send(reminderMsg);
@@ -276,9 +283,9 @@ function startGraceTimer() {
     } else {
       logger.info('Grace period expired but humans are present - staying in current state');
     }
-  }, CONFIG.emptyGraceSeconds * 1000);
+  }, MEETINGS_CONFIG.emptyGraceSeconds * 1000);
 
-  logger.debug(`Started grace timer (${CONFIG.emptyGraceSeconds}s)`);
+  logger.debug(`Started grace timer (${MEETINGS_CONFIG.emptyGraceSeconds}s)`);
 }
 
 function startJoinGraceTimer() {
@@ -297,9 +304,9 @@ function startJoinGraceTimer() {
     } else {
       logger.debug('Join grace period expired but no humans - staying Inactive');
     }
-  }, CONFIG.joinGraceSeconds * 1000);
+  }, MEETINGS_CONFIG.joinGraceSeconds * 1000);
 
-  logger.debug(`Started join grace timer (${CONFIG.joinGraceSeconds}s)`);
+  logger.debug(`Started join grace timer (${MEETINGS_CONFIG.joinGraceSeconds}s)`);
 }
 
 module.exports = {
@@ -327,4 +334,6 @@ module.exports = {
   getParticipantDurations,
   clearMeetingTracking,
   formatDuration,
+  getTargetVoiceChannel,
+  getAlertsChannel,
 };

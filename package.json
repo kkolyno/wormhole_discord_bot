@@ -1,17 +1,14 @@
 {
-  "name": "meeting-helper-bot",
-  "version": "1.0.0",
-  "description": "Discord bot that detects voice channel activity and prompts for NotesBot meeting notes",
+  "name": "wormhole-discord-bot",
+  "version": "2.0.0",
+  "description": "Modular Discord bot with multiple features",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "keywords": [
     "discord",
-    "bot",
-    "meeting",
-    "notes",
-    "notesbot"
+    "bot"
   ],
   "author": "",
   "license": "MIT",

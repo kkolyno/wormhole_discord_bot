@@ -1,4 +1,4 @@
-const { CONFIG } = require('../config');
+const { CONFIG } = require('./config');
 
 const LogLevel = {
   DEBUG: 'DEBUG',
@@ -78,4 +78,4 @@ async function safeExecute(operation, context, fallback = null) {
   }
 }
 
-module.exports = { logger, safeExecute };
+module.exports = { logger, safeExecute, LogLevel };

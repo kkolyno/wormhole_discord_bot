@@ -1,28 +1,79 @@
-const { Client, GatewayIntentBits } = require('discord.js');
-const { CONFIG, validateConfig } = require('./src/config');
-const { logger } = require('./src/utils/logger');
-const { setClient: setHelpersClient } = require('./src/utils/helpers');
-const { loadCommands } = require('./src/commands');
-const { loadEvents } = require('./src/events');
+const { createClient, GatewayIntentBits } = require('./src/core/client');
+const { CONFIG, validateConfig } = require('./src/core/config');
+const { logger } = require('./src/core/logger');
+const { setClient: setDiscordUtilsClient } = require('./src/utils/discord');
+const {
+  registerCommands,
+  registerEvents,
+  registerButtonHandlers,
+  registerStartupHook,
+  loadCommandsOnClient,
+  loadEventsOnClient,
+} = require('./src/core/registry');
 
-// Validate configuration before starting
+// Global commands and events
+const { globalCommands } = require('./src/commands');
+const { globalEvents, setupProcessHandlers } = require('./src/events');
+
+// Features
+const meetingsFeature = require('./src/features/meetings');
+
+// All features to load
+const features = [meetingsFeature];
+
+// Validate core configuration
 validateConfig();
 
-// Create Discord client
-const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
-});
+// Validate and collect intents from all features
+const featureIntents = [];
+const cleanupCallbacks = [];
 
-// Initialize modules with client reference
+for (const feature of features) {
+  if (feature.validate) {
+    feature.validate();
+  }
+  if (feature.intents) {
+    featureIntents.push(...feature.intents);
+  }
+  if (feature.cleanup) {
+    cleanupCallbacks.push(feature.cleanup);
+  }
+}
+
+// Create Discord client with all required intents
+const client = createClient(featureIntents);
+
+// Initialize shared utilities with client reference
 logger.setClient(client);
-setHelpersClient(client);
+setDiscordUtilsClient(client);
 
-// Load commands and events
-loadCommands(client);
-loadEvents(client);
+// Register global commands and events
+registerCommands(globalCommands);
+registerEvents(globalEvents);
+
+// Register feature components
+for (const feature of features) {
+  if (feature.commands) {
+    registerCommands(feature.commands);
+  }
+  if (feature.events) {
+    registerEvents(feature.events);
+  }
+  if (feature.buttonHandlers) {
+    registerButtonHandlers(feature.buttonHandlers);
+  }
+  if (feature.onStartup) {
+    registerStartupHook(feature.onStartup);
+  }
+}
+
+// Load everything onto the client
+loadCommandsOnClient(client);
+loadEventsOnClient(client);
+setupProcessHandlers(client, cleanupCallbacks);
 
 // Start the bot
-console.log('Starting Meeting Helper Bot...');
+console.log('Starting Wormhole Bot...');
 client.login(CONFIG.token).catch((error) => {
   console.error('Failed to login:', error.message);
   process.exit(1);

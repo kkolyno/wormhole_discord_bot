@@ -1,6 +1,5 @@
 const { Events } = require('discord.js');
-const { logger } = require('../utils/logger');
-const { clearAllTimers } = require('../state/session');
+const { logger } = require('../core/logger');
 
 const errorEvents = [
   {
@@ -29,7 +28,7 @@ const errorEvents = [
   },
 ];
 
-function setupProcessHandlers(client) {
+function setupProcessHandlers(client, cleanupCallbacks = []) {
   process.on('unhandledRejection', (reason) => {
     logger.error('Unhandled Promise Rejection', reason instanceof Error ? reason : new Error(String(reason)));
   });
@@ -41,7 +40,16 @@ function setupProcessHandlers(client) {
 
   const gracefulShutdown = (signal) => {
     logger.info(`Received ${signal} - shutting down gracefully`);
-    clearAllTimers();
+    
+    // Run all cleanup callbacks
+    for (const cleanup of cleanupCallbacks) {
+      try {
+        cleanup();
+      } catch (e) {
+        // Ignore cleanup errors during shutdown
+      }
+    }
+    
     client.destroy();
     process.exit(0);
   };

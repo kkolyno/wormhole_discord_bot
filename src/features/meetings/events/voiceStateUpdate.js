@@ -1,7 +1,7 @@
 const { Events } = require('discord.js');
-const { CONFIG } = require('../config');
-const { logger, safeExecute } = require('../utils/logger');
-const { getTargetVoiceChannel, getHumanCount } = require('../utils/helpers');
+const { MEETINGS_CONFIG } = require('../config');
+const { logger, safeExecute } = require('../../../core/logger');
+const { getHumanCount } = require('../../../utils/discord');
 const {
   SessionState,
   getState,
@@ -18,7 +18,8 @@ const {
   trackUserJoin,
   trackUserLeave,
   clearMeetingTracking,
-} = require('../state/session');
+  getTargetVoiceChannel,
+} = require('../state');
 
 module.exports = {
   name: Events.VoiceStateUpdate,
@@ -26,7 +27,7 @@ module.exports = {
 
   async execute(oldState, newState) {
     await safeExecute(async () => {
-      const targetChannelId = CONFIG.voiceChannelId;
+      const targetChannelId = MEETINGS_CONFIG.voiceChannelId;
       const wasInTarget = oldState.channelId === targetChannelId;
       const isInTarget = newState.channelId === targetChannelId;
 
