@@ -5,6 +5,9 @@ const {
   ButtonBuilder,
   ButtonStyle,
   Events,
+  SlashCommandBuilder,
+  REST,
+  Routes,
 } = require('discord.js');
 
 // ============================================================================
@@ -14,6 +17,7 @@ const {
 const CONFIG = {
   // Required
   token: process.env.DISCORD_TOKEN,
+  clientId: process.env.CLIENT_ID,
   guildId: process.env.GUILD_ID,
   voiceChannelId: process.env.VOICE_CHANNEL_ID,
   notesTextChannelId: process.env.NOTES_TEXT_CHANNEL_ID,
@@ -30,7 +34,7 @@ const CONFIG = {
 
 // Validate required configuration
 function validateConfig() {
-  const required = ['token', 'guildId', 'voiceChannelId', 'notesTextChannelId'];
+  const required = ['token', 'clientId', 'guildId', 'voiceChannelId', 'notesTextChannelId'];
   const missing = required.filter((key) => !CONFIG[key]);
 
   if (missing.length > 0) {
@@ -44,6 +48,7 @@ function validateConfig() {
     });
     console.error('\nRequired environment variables:');
     console.error('  DISCORD_TOKEN        - Bot token from Discord Developer Portal');
+    console.error('  CLIENT_ID            - Bot application/client ID');
     console.error('  GUILD_ID             - Discord server ID');
     console.error('  VOICE_CHANNEL_ID     - Voice channel to monitor');
     console.error('  NOTES_TEXT_CHANNEL_ID - Text channel for prompts');
@@ -64,6 +69,34 @@ let sessionState = SessionState.INACTIVE;
 let graceTimer = null;
 let joinGraceTimer = null;
 let currentPromptMessageId = null;
+let botStartTime = Date.now();
+
+// ============================================================================
+// Slash Commands
+// ============================================================================
+
+const commands = [
+  new SlashCommandBuilder()
+    .setName('ping')
+    .setDescription('Check if the bot is alive'),
+  new SlashCommandBuilder()
+    .setName('status')
+    .setDescription('Get the current bot status'),
+];
+
+async function registerCommands() {
+  const rest = new REST({ version: '10' }).setToken(CONFIG.token);
+
+  try {
+    console.log('Registering slash commands...');
+    await rest.put(Routes.applicationGuildCommands(CONFIG.clientId, CONFIG.guildId), {
+      body: commands.map((cmd) => cmd.toJSON()),
+    });
+    console.log('Slash commands registered successfully');
+  } catch (error) {
+    console.error('Error registering slash commands:', error.message);
+  }
+}
 
 // ============================================================================
 // Discord Client Setup
@@ -295,6 +328,9 @@ client.once(Events.ClientReady, async (readyClient) => {
   console.log(`Join grace period: ${CONFIG.joinGraceSeconds}s`);
   console.log(`Empty grace period: ${CONFIG.emptyGraceSeconds}s`);
 
+  // Register slash commands
+  await registerCommands();
+
   // Check if there are already humans in the voice channel
   const voiceChannel = await getTargetVoiceChannel();
   const humanCount = getHumanCount(voiceChannel);
@@ -350,9 +386,38 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 });
 
 /**
- * Handle button interactions
+ * Handle button and slash command interactions
  */
 client.on(Events.InteractionCreate, async (interaction) => {
+  // Handle slash commands
+  if (interaction.isChatInputCommand()) {
+    const { commandName } = interaction;
+
+    if (commandName === 'ping') {
+      const latency = Date.now() - interaction.createdTimestamp;
+      await interaction.reply(`🏓 Pong! Latency: ${latency}ms | WebSocket: ${client.ws.ping}ms`);
+    } else if (commandName === 'status') {
+      const uptime = Math.floor((Date.now() - botStartTime) / 1000);
+      const hours = Math.floor(uptime / 3600);
+      const minutes = Math.floor((uptime % 3600) / 60);
+      const seconds = uptime % 60;
+
+      const voiceChannel = await getTargetVoiceChannel();
+      const humanCount = getHumanCount(voiceChannel);
+
+      let statusMsg = `📊 **Bot Status**\n`;
+      statusMsg += `> **State:** ${sessionState}\n`;
+      statusMsg += `> **Uptime:** ${hours}h ${minutes}m ${seconds}s\n`;
+      statusMsg += `> **Humans in VC:** ${humanCount}\n`;
+      statusMsg += `> **Join Grace Timer:** ${joinGraceTimer ? 'Active' : 'Inactive'}\n`;
+      statusMsg += `> **Empty Grace Timer:** ${graceTimer ? 'Active' : 'Inactive'}`;
+
+      await interaction.reply(statusMsg);
+    }
+    return;
+  }
+
+  // Handle button interactions
   if (!interaction.isButton()) return;
 
   const { customId } = interaction;
