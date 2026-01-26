@@ -152,6 +152,7 @@ const SessionState = {
   INACTIVE: 'inactive',
   PROMPTED: 'prompted',
   WAITING: 'waiting',
+  DECLINED: 'declined', // User said "No" - waiting for channel to empty before allowing new session
 };
 
 let sessionState = SessionState.INACTIVE;
@@ -400,8 +401,11 @@ function startGraceTimer() {
       logger.info('Grace period expired with no humans - resetting to Inactive');
       sessionState = SessionState.INACTIVE;
       currentPromptMessageId = null;
+    } else if (sessionState === SessionState.DECLINED) {
+      // Channel didn't empty during grace period, but user declined - stay declined
+      logger.info('Grace period expired but humans still present after decline - staying Declined');
     } else {
-      logger.info('Grace period expired but humans are present - staying Prompted');
+      logger.info('Grace period expired but humans are present - staying in current state');
     }
   }, CONFIG.emptyGraceSeconds * 1000);
 
@@ -505,11 +509,17 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         sessionState = SessionState.PROMPTED;
         await postMeetingPrompt();
       }
+      // DECLINED state: do nothing, wait for channel to empty first
     } else {
       // humanCount === 0
       clearJoinGraceTimer();
 
-      if ((sessionState === SessionState.PROMPTED || sessionState === SessionState.WAITING) && !graceTimer) {
+      if (sessionState === SessionState.DECLINED) {
+        // Channel is now empty after decline - reset immediately (no grace period needed)
+        logger.info('All humans left after decline - resetting to Inactive');
+        sessionState = SessionState.INACTIVE;
+        currentPromptMessageId = null;
+      } else if ((sessionState === SessionState.PROMPTED || sessionState === SessionState.WAITING) && !graceTimer) {
         logger.info('All humans left - starting grace timer');
         startGraceTimer();
       } else if (sessionState === SessionState.INACTIVE) {
@@ -592,12 +602,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
         // Disable buttons first
         await disablePromptButtons();
 
+        // Transition to DECLINED state - waiting for channel to empty before new session
+        sessionState = SessionState.DECLINED;
+
         // Acknowledge
         await safeReply({
           content: '👍 Okay, not starting notes for this session.',
         });
 
-        logger.info('User clicked No - session continues without notes');
+        logger.info('User clicked No - session declined, waiting for channel to empty');
       } catch (error) {
         logger.error('Error handling No button', error);
         try {

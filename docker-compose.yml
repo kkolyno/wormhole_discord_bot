@@ -6,8 +6,18 @@ services:
     container_name: meeting-helper-bot
     restart: unless-stopped
     environment:
+      # Required
       - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - CLIENT_ID=${CLIENT_ID}
       - GUILD_ID=${GUILD_ID}
       - VOICE_CHANNEL_ID=${VOICE_CHANNEL_ID}
       - NOTES_TEXT_CHANNEL_ID=${NOTES_TEXT_CHANNEL_ID}
+      # Optional
+      - PING_ROLE_ID=${PING_ROLE_ID:-}
+      - LOG_CHANNEL_ID=${LOG_CHANNEL_ID:-}
       - EMPTY_GRACE_SECONDS=${EMPTY_GRACE_SECONDS:-90}
+      - JOIN_GRACE_SECONDS=${JOIN_GRACE_SECONDS:-15}
+      - NOTESBOT_START_COMMAND=${NOTESBOT_START_COMMAND:-/join}
+      - NOTESBOT_STOP_COMMAND=${NOTESBOT_STOP_COMMAND:-/leave}
+      - NOTES_START_HINT=${NOTES_START_HINT:-}
+      - PROMPT_TEXT=${PROMPT_TEXT:-}
