@@ -2,6 +2,11 @@
 
 All notable changes to Oracle will be documented in this file.
 
+## [0.0.2] - 2026-01-26
+
+### Changed
+- Meeting prompts now appear immediately when 2+ users join voice channel (removed join grace timer delay)
+
 ## [0.0.1] - 2026-01-26
 
 ### Added

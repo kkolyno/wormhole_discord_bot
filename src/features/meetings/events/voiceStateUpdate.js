@@ -60,9 +60,11 @@ module.exports = {
       if (humanCount >= 2) {
         clearTimer('grace');
 
-        if (state === SessionState.INACTIVE && !isTimerActive('join')) {
-          logger.info('2+ humans in channel - starting join grace timer');
-          startJoinGraceTimer();
+        if (state === SessionState.INACTIVE) {
+          clearTimer('join');
+          logger.info('2+ humans in channel - posting prompt immediately');
+          setState(SessionState.PROMPTED);
+          await postMeetingPrompt();
         } else if (state === SessionState.WAITING && isJoin) {
           logger.info('New human joined while waiting - re-posting prompt');
           setState(SessionState.PROMPTED);
