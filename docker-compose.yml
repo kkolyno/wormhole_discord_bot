@@ -2,6 +2,7 @@ services:
   meeting-helper-bot:
     build:
       context: .
+      platform: linux/arm64/v8
     platform: linux/arm64/v8
     container_name: meeting-helper-bot
     restart: unless-stopped
