@@ -28,7 +28,7 @@ A Discord bot that detects when people join a voice channel and prompts for meet
 | `DISCORD_TOKEN` | Bot token from Discord Developer Portal |
 | `GUILD_ID` | Discord server (guild) ID |
 | `VOICE_CHANNEL_ID` | Voice channel ID to monitor |
-| `NOTES_TEXT_CHANNEL_ID` | Text channel ID for prompts and instructions |
+| `ALERTS_CHANNEL_ID` | Text channel ID for meeting prompts (tags users in VC) |
 
 ### Optional
 
@@ -90,7 +90,7 @@ services:
       - DISCORD_TOKEN=your_bot_token_here
       - GUILD_ID=123456789012345678
       - VOICE_CHANNEL_ID=123456789012345678
-      - NOTES_TEXT_CHANNEL_ID=123456789012345678
+      - ALERTS_CHANNEL_ID=123456789012345678
       # Optional
       - PING_ROLE_ID=123456789012345678
       - LOG_CHANNEL_ID=123456789012345678
@@ -142,7 +142,7 @@ npm install
 export DISCORD_TOKEN=your_token
 export GUILD_ID=your_guild_id
 export VOICE_CHANNEL_ID=your_voice_channel_id
-export NOTES_TEXT_CHANNEL_ID=your_text_channel_id
+export ALERTS_CHANNEL_ID=your_alerts_channel_id
 
 # Run the bot
 npm start
@@ -156,7 +156,7 @@ docker build -t meeting-helper-bot .
 docker run -e DISCORD_TOKEN=xxx \
   -e GUILD_ID=xxx \
   -e VOICE_CHANNEL_ID=xxx \
-  -e NOTES_TEXT_CHANNEL_ID=xxx \
+  -e ALERTS_CHANNEL_ID=xxx \
   meeting-helper-bot
 ```
 
@@ -187,8 +187,8 @@ By default, GHCR packages are private. To allow Portainer to pull without authen
 - Verify `VOICE_CHANNEL_ID` is correct (use Developer Mode to copy ID)
 
 ### Prompt not appearing
-- Check `NOTES_TEXT_CHANNEL_ID` is correct
-- Ensure bot has **Send Messages** permission in the text channel
+- Check `ALERTS_CHANNEL_ID` is correct
+- Ensure bot has **Send Messages** permission in the alerts channel
 
 ### Container exits immediately
 - Check logs: `docker logs meeting-helper-bot`
