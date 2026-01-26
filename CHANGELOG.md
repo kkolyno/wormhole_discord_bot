@@ -2,6 +2,11 @@
 
 All notable changes to Oracle will be documented in this file.
 
+## [0.0.3] - 2026-01-26
+
+### Fixed
+- Docker build now includes `src/` directory (was causing "Cannot find module" errors)
+
 ## [0.0.2] - 2026-01-26
 
 ### Changed

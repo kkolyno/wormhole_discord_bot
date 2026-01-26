@@ -27,3 +27,6 @@ Events are in `src/events/` folder, each file exports:
 - `name` - Event name (e.g., 'ready', 'interactionCreate')
 - `once` - Boolean for one-time events
 - `execute` - Async function to handle the event
+
+## Changelog
+When making changes, update `CHANGELOG.md` following the format in `.github/CHANGELOG_INSTRUCTIONS.md`.
