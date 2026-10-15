@@ -54,6 +54,18 @@ The final image also passed network-disabled public English inference using the 
 
 Read-only reviews identified concrete races; subsequent fixes and final regressions cover them. Static review is not a proof of absence of defects. The accidentally host-run early worker check failed private-root checks and is not verification; all passing execution above occurred inside the disposable worker/images. Intermediate stale-image/negative-fixture attempts are not the final result.
 
+## Development cleanup
+
+Implementation/evidence commit: `a1ca0ba` on `feat/rk3588-local-transcription`.
+Disposable worker `sb_4a3dd791` had no vault, orchestrator, production credentials
+or private recordings. It was stopped/deleted and verified absent in authenticated
+API inventory and Docker. This task's development image tags and installed
+workspace dependencies were removed without pruning shared caches. The retained
+`~/Documents/GitHub/_agent-sandbox/wormhole-meeting-transcription` workspace is
+approximately 1.8 MiB of source/docs/evidence; a new worker is required to resume
+execution. Main, rollback branches/images, private live journals and `.mcp.json`
+were not removed or repurposed.
+
 ## Still required before production activation
 
 1. Approve the long-transcript delivery policy (`.txt` attachment is still off).

@@ -103,6 +103,15 @@ Legacy meeting sources and original Dockerfile remain intact; root wiring,
 dependencies, error handling/logging and a new opt-in image were deliberately
 extended on the feature branch. Main and exact rollback remain available.
 
+Implementation/evidence were committed and pushed as `a1ca0ba`. Disposable worker
+`sb_4a3dd791` was stopped/deleted, verified absent through authenticated API
+inventory and Docker. Its development image tags and installed dependencies were
+removed without pruning shared caches. The retained, credential/audio-free
+workspace `~/Documents/GitHub/_agent-sandbox/wormhole-meeting-transcription` is
+approximately 1.8 MiB (source/docs/evidence only). It is not a running worker;
+future development needs a newly approved sandbox. No orchestrator or vault was
+loaded. The only remaining local untracked file is the user's `.mcp.json`.
+
 ## User's clarified goal
 
 - The bot listens to calls in the configured Discord voice channel.
