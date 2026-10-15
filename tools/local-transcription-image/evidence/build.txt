@@ -1,0 +1,67 @@
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  1.429MB
+Step 1/20 : FROM ghcr.io/kkolyno/wormhole_discord_bot@sha256:b281ad7f705f13fb2998c8cb5ee536a1a4beac2f26c894e8a7baff3d9adf650a AS validated-native
+ ---> b281ad7f705f
+Step 2/20 : FROM node:22.22.0-alpine3.23@sha256:e4bf2a82ad0a4037d28035ae71529873c069b13eb0455466ae0bc13363826e34 AS runtime
+ ---> e4bf2a82ad0a
+Step 3/20 : WORKDIR /app
+ ---> Using cache
+ ---> 911c10c88f15
+Step 4/20 : RUN test "$(uname -m)" = aarch64  && apk add --no-cache ffmpeg libstdc++ libgcc tini util-linux  && /usr/bin/flock --version | grep util-linux  && addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001 -G nodejs  && mkdir -p /data/transcription && chmod 700 /data/transcription && chown -R 1001:1001 /data
+ ---> Using cache
+ ---> 84a292edce64
+Step 5/20 : COPY --from=validated-native /usr/local/bin/whisper-cli /usr/local/bin/whisper-cli
+ ---> Using cache
+ ---> 157539eed880
+Step 6/20 : COPY --from=validated-native /usr/local/lib/ /usr/local/lib/
+ ---> Using cache
+ ---> b1a5b57e9068
+Step 7/20 : COPY --from=validated-native /opt/models/ /opt/models/
+ ---> Using cache
+ ---> 88351d5c1167
+Step 8/20 : COPY --from=validated-native /usr/share/licenses/ /usr/share/licenses/
+ ---> Using cache
+ ---> 9cfd7d9a80e2
+Step 9/20 : COPY --from=validated-native /usr/share/oracle-test-image/ /usr/share/transcription-image/
+ ---> Using cache
+ ---> 98f0041c3125
+Step 10/20 : ENV LD_LIBRARY_PATH=/usr/local/lib     LOCAL_TRANSCRIPTION_DATA_DIR=/data/transcription     WHISPER_CLI=/usr/local/bin/whisper-cli     WHISPER_MODEL=/opt/models/ggml-base.en.bin     FFMPEG_PATH=/usr/bin/ffmpeg
+ ---> Using cache
+ ---> 39bc195f5b4c
+Step 11/20 : COPY package*.json ./
+ ---> Using cache
+ ---> 2d78987800ee
+Step 12/20 : RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+ ---> Using cache
+ ---> 47d67bf226a2
+Step 13/20 : COPY index.js ./
+ ---> Using cache
+ ---> a877cdd97aa5
+Step 14/20 : COPY src/ ./src/
+ ---> 1880ed9e0a98
+Step 15/20 : COPY test/local-transcription/*.test.js ./test/local-transcription/
+ ---> 911df14a8951
+Step 16/20 : COPY tools/local-transcription-image/preflight.sh tools/local-transcription-image/public-helper.js ./tools/local-transcription-image/
+ ---> 4226294c32a2
+Step 17/20 : RUN test "$(node -p 'process.versions.node')" = 22.22.0  && test "$(wc -c < /opt/models/ggml-base.en.bin)" -eq 147964211  && echo 'a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002  /opt/models/ggml-base.en.bin' | sha256sum -c -  && ! ldd /usr/local/bin/whisper-cli 2>&1 | grep -E 'not found|Error loading|Error relocating'  && env -i PATH=/usr/local/bin:/usr/bin:/bin LANG=C.UTF-8 /usr/local/bin/whisper-cli --help >/dev/null 2>&1
+ ---> Running in eed598bb577a
+/opt/models/ggml-base.en.bin: OK
+ ---> Removed intermediate container eed598bb577a
+ ---> e5e227010ec4
+Step 18/20 : USER nodejs
+ ---> Running in 129e071e0b5f
+ ---> Removed intermediate container 129e071e0b5f
+ ---> d21c267034b3
+Step 19/20 : ENTRYPOINT ["/sbin/tini", "--", "docker-entrypoint.sh"]
+ ---> Running in cf17138e2d69
+ ---> Removed intermediate container cf17138e2d69
+ ---> 8e3e3b333b3e
+Step 20/20 : CMD ["node", "index.js"]
+ ---> Running in f9c544b61184
+ ---> Removed intermediate container f9c544b61184
+ ---> 679ea01ee78e
+Successfully built 679ea01ee78e
+Successfully tagged local-transcription-dev:final-20261015

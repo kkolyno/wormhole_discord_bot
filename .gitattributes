@@ -2,3 +2,4 @@
 experiments/whisper-smoke/evidence/** -whitespace
 experiments/whisper-smoke/reproduction-evidence/** -whitespace
 tools/oracle-test-image/evidence/** -whitespace
+tools/local-transcription-image/evidence/** -whitespace

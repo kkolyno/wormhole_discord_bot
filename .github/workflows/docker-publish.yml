@@ -11,9 +11,14 @@ on:
         type: boolean
         required: false
         default: false
+      local_transcription:
+        description: Build opt-in local transcription image (feature branches only; mutually exclusive with oracle_test)
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
-  group: ${{ inputs.oracle_test && format('oracle-test-image-{0}', github.sha) || format('normal-image-{0}', github.run_id) }}
+  group: ${{ inputs.local_transcription && format('transcription-image-{0}', github.sha) || inputs.oracle_test && format('oracle-test-image-{0}', github.sha) || format('normal-image-{0}', github.run_id) }}
   cancel-in-progress: false
 
 env:
@@ -23,12 +28,33 @@ env:
 jobs:
   build-and-push:
     if: ${{ !inputs.oracle_test || github.ref != 'refs/heads/main' }}
-    runs-on: ${{ inputs.oracle_test && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    runs-on: ${{ (inputs.oracle_test || inputs.local_transcription) && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     permissions:
       contents: read
       packages: write
 
     steps:
+      - name: Validate explicit image mode
+        shell: bash
+        env:
+          ORACLE_TEST: ${{ inputs.oracle_test }}
+          LOCAL_TRANSCRIPTION: ${{ inputs.local_transcription }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF: ${{ github.ref }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          if [[ "$ORACLE_TEST" == true && "$LOCAL_TRANSCRIPTION" == true ]]; then
+            echo '::error::oracle_test and local_transcription are mutually exclusive.'
+            exit 1
+          fi
+          if [[ "$LOCAL_TRANSCRIPTION" == true ]]; then
+            if [[ "$EVENT_NAME" != workflow_dispatch || "$REF_TYPE" != branch || "$REF" == refs/heads/main || ! "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              echo '::error::Local transcription requires explicit feature-branch dispatch and full commit SHA.'
+              exit 1
+            fi
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -40,6 +66,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata
+        if: ${{ !inputs.local_transcription }}
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -70,7 +97,23 @@ jobs:
             exit 1
           fi
 
+      - name: Refuse replacement of an existing transcription commit tag
+        if: ${{ inputs.local_transcription }}
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:transcription-${{ github.sha }}
+        run: |
+          if docker buildx imagetools inspect "$IMAGE" > /tmp/transcription-image-inspect.txt 2>&1; then
+            echo '::error::Transcription commit tag already exists; use a new commit.'
+            exit 1
+          fi
+          if ! grep -Eqi 'manifest unknown|not found|no such manifest' /tmp/transcription-image-inspect.txt; then
+            echo '::error::Cannot establish that the transcription commit tag is absent.'
+            exit 1
+          fi
+
       - name: Build and push Docker image
+        if: ${{ !inputs.local_transcription }}
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -79,3 +122,58 @@ jobs:
           platforms: linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      # Deliberately no metadata-generated latest or short-SHA tags for this mode.
+      - name: Build and load local transcription image
+        if: ${{ inputs.local_transcription }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.transcription
+          push: false
+          load: true
+          platforms: linux/arm64
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:transcription-${{ github.sha }}
+
+      - name: Offline native transcription preflight
+        if: ${{ inputs.local_transcription }}
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:transcription-${{ github.sha }}
+        run: |
+          # No host environment, credentials, Docker socket, or network enters
+          # this container. Its only writable state is disposable tmpfs.
+          docker run --rm --platform linux/arm64 --network none --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev \
+            --tmpfs /data/transcription:rw,nosuid,nodev,mode=0700,uid=1001,gid=1001 \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --entrypoint /sbin/tini "$IMAGE" -- sh tools/local-transcription-image/preflight.sh
+
+      - name: Public English recognizer smoke
+        if: ${{ inputs.local_transcription }}
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:transcription-${{ github.sha }}
+        run: |
+          set -euo pipefail
+          FIXTURE="$RUNNER_TEMP/transcription-public-jfk.wav"
+          trap 'rm -f "$FIXTURE"' EXIT
+          curl --fail --location --silent --show-error --proto '=https' \
+            --connect-timeout 15 --max-time 90 \
+            https://raw.githubusercontent.com/ggml-org/whisper.cpp/d1be6fde11ac6e0407606b4e42fe72d34add8037/samples/jfk.wav \
+            -o "$FIXTURE"
+          echo "59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e  $FIXTURE" | sha256sum -c -
+          chmod 644 "$FIXTURE"
+          docker run --rm --platform linux/arm64 --network none --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev \
+            --tmpfs /data/transcription:rw,nosuid,nodev,mode=0700,uid=1001,gid=1001 \
+            --mount "type=bind,source=$FIXTURE,target=/fixtures/jfk.wav,readonly" \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --entrypoint /sbin/tini "$IMAGE" -- node tools/local-transcription-image/public-helper.js
+
+      - name: Push tested local transcription image
+        if: ${{ inputs.local_transcription }}
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:transcription-${{ github.sha }}
+        run: docker push "$IMAGE"

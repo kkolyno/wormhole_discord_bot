@@ -16,10 +16,12 @@ const { globalCommands } = require('./src/commands');
 const { globalEvents, setupProcessHandlers } = require('./src/events');
 
 // Features
-const meetingsFeature = require('./src/features/meetings');
+const localTranscriptionEnabled = process.env.LOCAL_TRANSCRIPTION_ENABLED === 'true';
 
-// All features to load
-const features = [meetingsFeature];
+// Exactly one session/summary owner. Legacy sources and default behavior stay unchanged.
+const features = [localTranscriptionEnabled
+  ? require('./src/features/local-transcription')
+  : require('./src/features/meetings')];
 
 // Validate core configuration
 validateConfig();
@@ -42,6 +44,7 @@ for (const feature of features) {
 
 // Create Discord client with all required intents
 const client = createClient(featureIntents);
+for (const feature of features) feature.configureClient?.(client);
 
 // Initialize shared utilities with client reference
 logger.setClient(client);
@@ -75,6 +78,6 @@ setupProcessHandlers(client, cleanupCallbacks);
 // Start the bot
 console.log('Starting Wormhole Bot...');
 client.login(CONFIG.token).catch((error) => {
-  console.error('Failed to login:', error.message);
+  console.error('Failed to login:', localTranscriptionEnabled ? 'DISCORD_LOGIN_FAILED' : error.message);
   process.exit(1);
 });

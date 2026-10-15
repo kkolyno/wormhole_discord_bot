@@ -1,0 +1,10 @@
+test_economic_pinned_native_artifacts (__main__.ImageContract.test_economic_pinned_native_artifacts) ... ok
+test_explicit_branch_only_mutually_exclusive_native_arm_dispatch (__main__.ImageContract.test_explicit_branch_only_mutually_exclusive_native_arm_dispatch) ... ok
+test_preflight_and_smoke_are_offline_public_only (__main__.ImageContract.test_preflight_and_smoke_are_offline_public_only) ... ok
+test_private_nonroot_tini_actual_flock_and_safe_entrypoint (__main__.ImageContract.test_private_nonroot_tini_actual_flock_and_safe_entrypoint) ... ok
+test_transcription_push_only_after_offline_native_test_of_loaded_image (__main__.ImageContract.test_transcription_push_only_after_offline_native_test_of_loaded_image) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.001s
+
+OK

@@ -10,6 +10,21 @@ The prior recovery session recorded verification on **2026-10-15** for the deplo
 `wormhole_discord_bot`, rather than the placeholder configuration in the general
 README. The observations below describe that verification, not a fresh host check.
 
+## Subsequent transcription work (2026-10-15)
+
+The later authorized one-shot Oracle test, immutable test image and exact rollback
+are recorded in [`docs/ORACLE_LIVE_TEST.md`](docs/ORACLE_LIVE_TEST.md). That deployment
+supersedes the historical running-image table below.
+
+A durable meeting-transcription mode is now implemented on the feature branch,
+**off by default and not published/deployed**. Read
+[`docs/LOCAL_TRANSCRIPTION.md`](docs/LOCAL_TRANSCRIPTION.md) and
+[`docs/LOCAL_TRANSCRIPTION_RESULTS.md`](docs/LOCAL_TRANSCRIPTION_RESULTS.md) before
+any activation. Long `.txt` attachments are still unapproved/off. The one-shot
+administration helper deliberately does not activate the new mode; it needs a
+separately reviewed immutable-image/volume/stop-grace/rollback procedure. Do not
+reuse a completed activation job, pull `latest`, or erase a one-shot marker.
+
 ## Deployment identity
 
 | Item | Value |

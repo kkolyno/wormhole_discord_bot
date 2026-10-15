@@ -1,4 +1,7 @@
 const { CONFIG } = require('./config');
+// HTTP/native errors can contain request bodies or private paths. The opt-in
+// transcription runtime never forwards their message/stack to console or Discord.
+const privateErrors = () => process.env.LOCAL_TRANSCRIPTION_ENABLED === 'true';
 
 const LogLevel = {
   DEBUG: 'DEBUG',
@@ -22,13 +25,13 @@ const logger = {
       this.logChannel = await guild.channels.fetch(CONFIG.logChannelId);
       this.info('Log channel initialized');
     } catch (error) {
-      console.error('Failed to initialize log channel:', error.message);
+      console.error('Failed to initialize log channel:', privateErrors() ? 'LOG_CHANNEL_INIT_FAILED' : error.message);
     }
   },
 
   async _log(level, message, error = null) {
     const timestamp = new Date().toISOString();
-    const consoleMsg = `[${timestamp}] [${level}] ${message}${error ? `: ${error.message}` : ''}`;
+    const consoleMsg = `[${timestamp}] [${level}] ${message}${error ? `: ${privateErrors() ? 'details suppressed' : error.message}` : ''}`;
 
     if (level === LogLevel.ERROR) {
       console.error(consoleMsg);
@@ -49,7 +52,7 @@ const logger = {
 
         let discordMsg = `${emoji} **[${level}]** ${message}`;
         if (error) {
-          discordMsg += `\n\`\`\`${error.stack || error.message}\`\`\``;
+          discordMsg += privateErrors() ? '\nDetails suppressed.' : `\n\`\`\`${error.stack || error.message}\`\`\``;
         }
 
         if (discordMsg.length > 2000) {
@@ -58,7 +61,7 @@ const logger = {
 
         await this.logChannel.send(discordMsg);
       } catch (err) {
-        console.error('Failed to send log to Discord:', err.message);
+        console.error('Failed to send log to Discord:', privateErrors() ? 'LOG_DELIVERY_FAILED' : err.message);
       }
     }
   },

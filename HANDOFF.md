@@ -8,12 +8,20 @@ design or treat its model choices, performance estimates, snippets, or guarantee
 as evidence. This file is the requirements/context handoff, not a validated
 implementation design.
 
-**Current task:** complete the explicitly consented Oracle microphone test, then
-use its evidence plus representative workload requirements to design the smallest
-robust meeting-transcription integration. Target hardware and local public-sample
-recognition are now verified; live microphone receive/decryption is not yet proven.
-The user has authorized the bounded Oracle work described below; unrelated changes
-and broader deployment still require their appropriate authorization.
+**Current status (2026-10-15, after microphone feedback):** The user reported the
+actual microphone transcript looked very good and basically realtime, then asked
+us to continue. A durable, explicitly consented meeting-transcription feature is
+now implemented behind `LOCAL_TRANSCRIPTION_ENABLED=true`, **not published or
+deployed**. Final ARM64 Node22 image verification passed **159/159 tests** plus
+network-disabled public inference and real cross-container writer exclusion.
+Read [`docs/LOCAL_TRANSCRIPTION.md`](docs/LOCAL_TRANSCRIPTION.md),
+[`docs/LOCAL_TRANSCRIPTION_RESULTS.md`](docs/LOCAL_TRANSCRIPTION_RESULTS.md), and
+the contract before further work. Long `.txt` attachments remain unapproved/off.
+The live one-shot outcome remains formally incomplete (intentional-teardown false
+fault identified/fixed); sustained/multi-speaker capacity is not established.
+No new production mutation occurred during this implementation phase. Broader
+activation still needs controlled deployment/rollback review and appropriate
+user authorization.
 
 **Earlier read-only 2026-10-15 feasibility phase:** see
 [`docs/TRANSCRIPTION_FEASIBILITY.md`](docs/TRANSCRIPTION_FEASIBILITY.md). Read-only
@@ -79,9 +87,21 @@ image, or Compose source change was needed. Audit records are in the existing
 private journal with prefix `rearm-20261015210556`.
 Fresh enabled notice (verified through Discord), expires **21:16:05 UTC**:
 https://discord.com/channels/1465125548379607094/1465216403241041981/1560398382244036720
-The old notice remains disabled. No new consent/capture outcome has been observed.
-Do not repeat this reset on any nonempty/ambiguous run; rearming required the
-user's fresh readiness and explicit zero-audio expiry checks with the service stopped.
+The old notice remains disabled. This paragraph records the original rearm state;
+the later outcome is below. Do not repeat this reset on any nonempty/ambiguous run;
+rearming required fresh readiness and explicit zero-audio expiry checks with the
+service stopped.
+
+**Later outcome:** 30-second capture, 3,271,680 PCM bytes, four jobs, finished
+`2026-10-15T21:06:47.739Z`; recorded `incomplete`, `duration_limit`, with
+`BOT_MOVED_OR_DEAFENED`. The user evaluated the transcript positively. The
+prototype lacked an intentional-disconnect guard; it is now fixed and tested,
+without rewriting historical evidence. Only bounded outcome metadata was read;
+no private speech was transferred to workers or committed. The new meeting
+feature was built separately in a credential-free disposable ARM64 worker.
+Legacy meeting sources and original Dockerfile remain intact; root wiring,
+dependencies, error handling/logging and a new opt-in image were deliberately
+extended on the feature branch. Main and exact rollback remain available.
 
 ## User's clarified goal
 
@@ -266,8 +286,9 @@ and crash after a successful send. A happy-path demo is not robustness evidence.
 
 ## Working-tree and operational safety
 
-- This cleanup changed documentation only. No host was contacted, no bot started,
-  no dependencies installed, and no runtime source/configuration changed.
+- The initial cleanup changed documentation only. Subsequent authorized live-test
+  work and the later guarded implementation are described above; do not mistake
+  the initial documentation-only stage for the current branch's full change set.
 - Removed the rejected `TRANSCRIPTION_PLAN.md` and stale
   `.github/copilot-instructions.md` (which incorrectly prescribed `config.json`
   credential storage).
@@ -286,9 +307,10 @@ and crash after a successful send. A happy-path demo is not robustness evidence.
 
 ## Suggested opening for the next conversation
 
-"Read HANDOFF.md and DEPLOYMENT.md. Build toward robust local RK3588 transcription
-for this Discord bot. Capture and process audio during calls; only the final
-summary publication waits for the completed transcript. The prior plan was
-rejected. Start by identifying what can be verified safely and the minimum
-hardware/audio feasibility tests. Keep implementation decisions evidence-based,
-and do not alter production without permission."
+"Read HANDOFF.md, docs/LOCAL_TRANSCRIPTION.md and its RESULTS/CONTRACT documents.
+Review the guarded durable implementation and evidence; it is not deployed.
+Confirm the long-transcript policy, then arrange controlled immutable-image
+activation/rollback and a fresh consented end-to-end meeting-flow test. Benchmark
+the new fsync/spooling/concurrency path on the RK3588 before claiming capacity.
+Preserve main, exact original rollback, private journals and the user's local
+.mcp.json. Do not silently rearm the one-shot or expose private speech/credentials."

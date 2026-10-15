@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "scope": "credential-free disposable ARM64 development VM, not RK3588",
+  "imageId": "sha256:679ea01ee78e16482f7ab0a901d8d4afda77a784c4f103f3d2dd5ba70657c5b3",
+  "tag": "local-transcription-dev:final-20261015",
+  "platform": "linux/arm64",
+  "runtimeNode": "22.22.0",
+  "nativeUnitTests": {
+    "tests": 159,
+    "pass": 159,
+    "fail": 0,
+    "skip": 0
+  },
+  "sourceWorkerTests": {
+    "node": "24.18.0",
+    "tests": 159,
+    "pass": 158,
+    "fail": 0,
+    "skip": 1,
+    "skipReason": "real ffmpeg unavailable in outer worker"
+  },
+  "staticContracts": {
+    "newImageAndWorkflow": 5,
+    "existingOracle": 3
+  },
+  "otherRegressions": {
+    "feasibilityAndOracleNode": {
+      "tests": 58,
+      "pass": 57,
+      "fail": 0,
+      "skip": 1
+    },
+    "hardwarePython": 5,
+    "adminPython": 38
+  },
+  "networkDisabledPublicEnglishInference": true,
+  "actualNewRecognizerHelperPublicFixture": true,
+  "actualCrossContainerWriterExclusionAndRelease": true,
+  "finalImageMatchesSourceHashManifest": true,
+  "actionlint": "1.7.7 verified SHA-256; pass",
+  "newFeatureDeployment": "not published or deployed",
+  "privateAudioOrCredentialsUsed": false
+}

@@ -59,6 +59,26 @@ test('adapter uses only configured channels, ready voice selfDeaf:false/selfMute
   await f.adapter.destroy();
 });
 
+test('intentional disconnect ignores resulting bot leave/deafen and connection teardown, but a fresh join faults again', async () => {
+  const f = fakeRuntime(), faults = []; f.adapter.on('fault', code => faults.push(code));
+  await f.adapter.initialize(new AbortController().signal);
+  const owner = '111111111111111111';
+  await f.adapter.join(owner, new AbortController().signal);
+  f.connection().destroy = () => {
+    f.connection().emit('stateChange', { status: 'ready' }, { status: 'destroyed' });
+    f.client.emit('voiceState', {}, { id: TARGET.application, channelId: null, selfDeaf: true });
+    f.client.emit('voiceState', {}, { id: owner, channelId: null });
+  };
+  f.adapter.disconnect();
+  f.client.emit('voiceState', {}, { id: TARGET.application, channelId: 'elsewhere', serverDeaf: true });
+  assert.deepEqual(faults, []); // duration_limit followed by normal teardown is not incomplete.
+  await f.adapter.join(owner, new AbortController().signal);
+  f.client.emit('voiceState', {}, { id: TARGET.application, channelId: 'elsewhere' });
+  f.client.emit('voiceState', {}, { id: TARGET.application, channelId: TARGET.channel, serverDeaf: true });
+  assert.deepEqual(faults, ['BOT_MOVED_OR_DEAFENED', 'BOT_MOVED_OR_DEAFENED']);
+  await f.adapter.destroy();
+});
+
 test('boot integration consumes durable attempted marker BEFORE test spawn and restart marker skips test', async () => {
   for (const alreadyAttempted of [false, true]) {
     const calls = [], storage = { privateDir: dir => { assert.equal(dir, DATA); calls.push('private'); },

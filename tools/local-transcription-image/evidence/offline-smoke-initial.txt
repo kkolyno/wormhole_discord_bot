@@ -1,0 +1,768 @@
+
+== Runtime and inherited native build evidence ==
+v22.22.0
+10.9.4
+Linux 7.0.14-orbstack-00380-ga7e0a2dc9535 aarch64
+3.23.3
+gcc (Alpine 15.2.0) 15.2.0
+Copyright (C) 2025 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+g++ (Alpine 15.2.0) 15.2.0
+Copyright (C) 2025 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+cmake version 4.1.3
+
+CMake suite maintained and supported by Kitware (kitware.com/cmake).
+3.23.3
+flock from util-linux 2.41.6
+ffmpeg version 8.0.1 Copyright (c) 2000-2025 the FFmpeg developers
+built with gcc 15.2.0 (Alpine 15.2.0)
+configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharfbuzz --enable-libjxl --enable-libmp3lame --enable-libopenmpt --enable-libopus --enable-libplacebo --enable-libpulse --enable-librav1e --enable-librist --enable-libshaderc --enable-libsoxr --enable-libsrt --enable-libssh --enable-libtheora --enable-libv4l2 --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxcb --enable-libxml2 --enable-libxvid --enable-libzimg --enable-libzmq --enable-lto=auto --enable-lv2 --enable-openssl --enable-pic --enable-pthreads --enable-shared --enable-vaapi --enable-vdpau --enable-version3 --enable-vulkan --optflags=-O3 --enable-libsvtav1
+libavutil      60.  8.100 / 60.  8.100
+libavcodec     62. 11.100 / 62. 11.100
+libavformat    62.  3.100 / 62.  3.100
+libavdevice    62.  1.100 / 62.  1.100
+libavfilter    11.  4.100 / 11.  4.100
+libswscale      9.  1.100 /  9.  1.100
+libswresample   6.  1.100 /  6.  1.100
+
+Exiting with exit code 0
+	/lib/ld-musl-aarch64.so.1 (0xffffbc7a0000)
+	libwhisper.so.1 => /usr/local/lib/libwhisper.so.1 (0xffffbc62d000)
+	libggml.so.0 => /usr/local/lib/libggml.so.0 (0xffffbc60c000)
+	libstdc++.so.6 => /usr/lib/libstdc++.so.6 (0xffffbc347000)
+	libgcc_s.so.1 => /usr/lib/libgcc_s.so.1 (0xffffbc316000)
+	libc.musl-aarch64.so.1 => /lib/ld-musl-aarch64.so.1 (0xffffbc7a0000)
+	libggml-base.so.0 => /usr/local/lib/libggml-base.so.0 (0xffffbc245000)
+	libggml-cpu.so.0 => /usr/local/lib/libggml-cpu.so.0 (0xffffbc0d4000)
+/opt/models/ggml-base.en.bin: OK
+
+== Exact dependency versions and offline native codec load ==
+wormhole-discord-bot@2.0.0 /app
++-- @discordjs/voice@0.19.2
++-- @snazzah/davey@0.1.12
++-- discord.js@14.27.0
++-- dotenv@17.2.3
+`-- opusscript@0.0.8
+
+PASS: DAVE native load and Opus synthetic roundtrip (not real DAVE receive proof)
+
+== Fake/synthetic unit contracts, real OS lock, bounded shutdown ==
+TAP version 13
+# Subtest: no subscription before explicit consent; ready handshake primes only owner; independent per-speaker state, no PCM retained
+ok 1 - no subscription before explicit consent; ready handshake primes only owner; independent per-speaker state, no PCM retained
+  ---
+  duration_ms: 8.310023
+  type: 'test'
+  ...
+# Subtest: revocation is synchronous, drops queued old tail; leave/rejoin requires new consent and fresh codec/stream
+ok 2 - revocation is synchronous, drops queued old tail; leave/rejoin requires new consent and fresh codec/stream
+  ---
+  duration_ms: 2.163076
+  type: 'test'
+  ...
+# Subtest: close drains last paused packet through base Readable EOF, disallows subscriptions and is idempotent
+ok 3 - close drains last paused packet through base Readable EOF, disallows subscriptions and is idempotent
+  ---
+  duration_ms: 0.836078
+  type: 'test'
+  ...
+# Subtest: real pinned voice 0.19.2 AudioReceiveStream regression: buffered final words not destroyed by push(null)
+ok 4 - real pinned voice 0.19.2 AudioReceiveStream regression: buffered final words not destroyed by push(null)
+  ---
+  duration_ms: 42.23772
+  type: 'test'
+  ...
+# Subtest: real voice receiver resubscription waits old Map deletion; revoke racing EOF is intentional, not a fault
+ok 5 - real voice receiver resubscription waits old Map deletion; revoke racing EOF is intentional, not a fault
+  ---
+  duration_ms: 1.895468
+  type: 'test'
+  ...
+# Subtest: revocation during pending drain drops tail without reporting a false fault
+ok 6 - revocation during pending drain drops tail without reporting a false fault
+  ---
+  duration_ms: 1.095186
+  type: 'test'
+  ...
+# Subtest: retiring decoder/streams count toward memory cap during account churn
+ok 7 - retiring decoder/streams count toward memory cap during account churn
+  ---
+  duration_ms: 0.543801
+  type: 'test'
+  ...
+# Subtest: bounded speakers, packets, PCM and buffered queues fail closed with sanitized codes
+ok 8 - bounded speakers, packets, PCM and buffered queues fail closed with sanitized codes
+  ---
+  duration_ms: 3.409817
+  type: 'test'
+  ...
+# Subtest: real move, self/server deafen, reconnect/disconnect, receive/EOF faults are distinct from expected teardown
+ok 9 - real move, self/server deafen, reconnect/disconnect, receive/EOF faults are distinct from expected teardown
+  ---
+  duration_ms: 3.975536
+  type: 'test'
+  ...
+# Subtest: bounded drain failure cannot claim complete audio; callback/decode init failure sanitized
+ok 10 - bounded drain failure cannot claim complete audio; callback/decode init failure sanitized
+  ---
+  duration_ms: 11.720507
+  type: 'test'
+  ...
+# Subtest: failed ready handshake cleans listeners/connection and allows a later fresh open
+ok 11 - failed ready handshake cleans listeners/connection and allows a later fresh open
+  ---
+  duration_ms: 2.827679
+  type: 'test'
+  ...
+# Subtest: subscriber/callback failures sanitize and dispose partially initialized resources
+ok 12 - subscriber/callback failures sanitize and dispose partially initialized resources
+  ---
+  duration_ms: 0.961631
+  type: 'test'
+  ...
+# Subtest: actual WASM Opus decode handles variable bounded frame sizes without sharing codec state
+ok 13 - actual WASM Opus decode handles variable bounded frame sizes without sharing codec state
+  ---
+  duration_ms: 27.073476
+  type: 'test'
+  ...
+# Subtest: strict opt-in and attachment approval default off
+ok 14 - strict opt-in and attachment approval default off
+  ---
+  duration_ms: 1.076725
+  type: 'test'
+  ...
+# Subtest: invalid IDs, relative root, malformed and excessive limits fail without echoing input
+ok 15 - invalid IDs, relative root, malformed and excessive limits fail without echoing input
+  ---
+  duration_ms: 0.612891
+  type: 'test'
+  ...
+# Subtest: timed-out late audio handshake closes without any subscription, accepted PCM, or revived session
+ok 16 - timed-out late audio handshake closes without any subscription, accepted PCM, or revived session
+  ---
+  duration_ms: 18.393961
+  type: 'test'
+  ...
+# Subtest: real fault during handshake clears acceptance and does not permit a later subscription before queued fault teardown
+ok 17 - real fault during handshake clears acceptance and does not permit a later subscription before queued fault teardown
+  ---
+  duration_ms: 4.432412
+  type: 'test'
+  ...
+# Subtest: unconfirmed capture EOF is explicitly incomplete, cannot authorize a second physical capture, and shutdown awaits actual close
+ok 18 - unconfirmed capture EOF is explicitly incomplete, cannot authorize a second physical capture, and shutdown awaits actual close
+  ---
+  duration_ms: 43.16364
+  type: 'test'
+  ...
+# Subtest: durable metadata failure synchronously closes privacy gate and receiver even when lifecycle checkpoint cannot commit
+ok 19 - durable metadata failure synchronously closes privacy gate and receiver even when lifecycle checkpoint cannot commit
+  ---
+  duration_ms: 2.764882
+  type: 'test'
+  ...
+# Subtest: per-user unsubscribe finishes before fresh resubscribe; invalidation epoch memory is participant-bounded
+ok 20 - per-user unsubscribe finishes before fresh resubscribe; invalidation epoch memory is participant-bounded
+  ---
+  duration_ms: 3.957076
+  type: 'test'
+  ...
+# Subtest: first lone human creates a notice, only current member explicit consent opens/subscribes; bounded status is private
+ok 21 - first lone human creates a notice, only current member explicit consent opens/subscribes; bounded status is private
+  ---
+  duration_ms: 10.629738
+  type: 'test'
+  ...
+# Subtest: revoke invalidates synchronously before queued work, preserves accepted prefix, and rejoin never auto-consents
+ok 22 - revoke invalidates synchronously before queued work, preserves accepted prefix, and rejoin never auto-consents
+  ---
+  duration_ms: 13.109511
+  type: 'test'
+  ...
+# Subtest: leave invalidation during pending voice readiness rejects consent and every later callback
+ok 23 - leave invalidation during pending voice readiness rejects consent and every later callback
+  ---
+  duration_ms: 2.377262
+  type: 'test'
+  ...
+# Subtest: unknown occupancy is NOT empty, resets grace, stops gates and does not extend durations across unknown outage
+ok 24 - unknown occupancy is NOT empty, resets grace, stops gates and does not extend durations across unknown outage
+  ---
+  duration_ms: 3.166669
+  type: 'test'
+  ...
+# Subtest: known-empty grace only, one remaining person stays active; all participants cumulative durations preserved
+ok 25 - known-empty grace only, one remaining person stays active; all participants cumulative durations preserved
+  ---
+  duration_ms: 3.304266
+  type: 'test'
+  ...
+# Subtest: hard segmentation, >850ms gap and EOF preserve final bytes without inventing silence; stale callbacks ignored
+ok 26 - hard segmentation, >850ms gap and EOF preserve final bytes without inventing silence; stale callbacks ignored
+  ---
+  duration_ms: 5.573519
+  type: 'test'
+  ...
+# Subtest: old session drains in background while new session captures; global recognizer slot stays one
+ok 27 - old session drains in background while new session captures; global recognizer slot stays one
+  ---
+  duration_ms: 9.151559
+  type: 'test'
+  ...
+# Subtest: explicit end holds prompts until known empty, persists hold across recovery, and old notice cannot affect next session
+ok 28 - explicit end holds prompts until known empty, persists hold across recovery, and old notice cannot affect next session
+  ---
+  duration_ms: 10.33942
+  type: 'test'
+  ...
+# Subtest: drain deadline cancels accepted jobs explicitly, late recognition cannot rewrite result or overlap next call
+ok 29 - drain deadline cancels accepted jobs explicitly, late recognition cannot rewrite result or overlap next call
+  ---
+  duration_ms: 4.649432
+  type: 'test'
+  ...
+# Subtest: global pending queue overload accounts partial acceptance and rejection, stops capture immediately, never hides incompleteness
+ok 30 - global pending queue overload accounts partial acceptance and rejection, stops capture immediately, never hides incompleteness
+  ---
+  duration_ms: 5.497886
+  type: 'test'
+  ...
+# Subtest: spool and disk failures stop gating; accepted/rejected accounting and failure reasons remain explicit
+ok 31 - spool and disk failures stop gating; accepted/rejected accounting and failure reasons remain explicit
+  ---
+  duration_ms: 10.799462
+  type: 'test'
+  ...
+# Subtest: restart recovers open PCM and old active durations only to durable lastSeenAt, no capture or auto-consent even when empty
+ok 32 - restart recovers open PCM and old active durations only to durable lastSeenAt, no capture or auto-consent even when empty
+  ---
+  duration_ms: 2.042649
+  type: 'test'
+  ...
+# Subtest: shutdown awaits capture EOF and native abort close, checkpoints accepted tail and queued jobs without publishing
+ok 33 - shutdown awaits capture EOF and native abort close, checkpoints accepted tail and queued jobs without publishing
+  ---
+  duration_ms: 5.736784
+  type: 'test'
+  ...
+# Subtest: consent/participant/session duration caps are protective, and actual audio faults invalidate gates synchronously
+ok 34 - consent/participant/session duration caps are protective, and actual audio faults invalidate gates synchronously
+  ---
+  duration_ms: 6.413096
+  type: 'test'
+  ...
+# Subtest: notice/publication failures remain background-owned, do not block new capture or leak raw exceptions
+ok 35 - notice/publication failures remain background-owned, do not block new capture or leak raw exceptions
+  ---
+  duration_ms: 2.29338
+  type: 'test'
+  ...
+# Subtest: root strictly selects one owner and does not eagerly load legacy
+ok 36 - root strictly selects one owner and does not eagerly load legacy
+  ---
+  duration_ms: 1.022345
+  type: 'test'
+  ...
+# Subtest: lock precedes recovery; recovery precedes membership; attachments stay unapproved
+ok 37 - lock precedes recovery; recovery precedes membership; attachments stay unapproved
+  ---
+  duration_ms: 2.264878
+  type: 'test'
+  ...
+# Subtest: shutdown during startup cannot create a store/coordinator after releasing the lock
+ok 38 - shutdown during startup cannot create a store/coordinator after releasing the lock
+  ---
+  duration_ms: 0.455418
+  type: 'test'
+  ...
+# Subtest: only exact current bot-authored notice and present human may use static IDs
+ok 39 - only exact current bot-authored notice and present human may use static IDs
+  ---
+  duration_ms: 0.78649
+  type: 'test'
+  ...
+# Subtest: leave immediately invalidates before blocked snapshot, revoke before acknowledgement
+ok 40 - leave immediately invalidates before blocked snapshot, revoke before acknowledgement
+  ---
+  duration_ms: 0.873665
+  type: 'test'
+  ...
+# Subtest: membership changes during consent acknowledgement cannot restore consent
+ok 41 - membership changes during consent acknowledgement cannot restore consent
+  ---
+  duration_ms: 0.66002
+  type: 'test'
+  ...
+# Subtest: unknown occupancy stays null and gateway interruption invalidates synchronously
+ok 42 - unknown occupancy stays null and gateway interruption invalidates synchronously
+  ---
+  duration_ms: 0.583054
+  type: 'test'
+  ...
+# Subtest: lock loss closes capture immediately and disables further consent
+ok 43 - lock loss closes capture immediately and disables further consent
+  ---
+  duration_ms: 0.428915
+  type: 'test'
+  ...
+# Subtest: status is bounded allowlisted metadata, never exception or transcript text
+ok 44 - status is bounded allowlisted metadata, never exception or transcript text
+  ---
+  duration_ms: 0.367117
+  type: 'test'
+  ...
+# Subtest: REST transport is bounded, no retries/pings, handles files, and sanitizes errors
+ok 45 - REST transport is bounded, no retries/pings, handles files, and sanitizes errors
+  ---
+  duration_ms: 11.098949
+  type: 'test'
+  ...
+# Subtest: actual util-linux OS lock excludes a second writer, releases cleanly
+ok 46 - actual util-linux OS lock excludes a second writer, releases cleanly
+  ---
+  duration_ms: 57.179818
+  type: 'test'
+  ...
+# Subtest: unexpected holder loss invokes fail-closed hook exactly once
+ok 47 - unexpected holder loss invokes fail-closed hook exactly once
+  ---
+  duration_ms: 22.211899
+  type: 'test'
+  ...
+# Subtest: parent crash closes holder stdin and permits the next process
+ok 48 - parent crash closes holder stdin and permits the next process
+  ---
+  duration_ms: 86.914834
+  type: 'test'
+  ...
+# Subtest: root or lock symlinks and permissive roots fail closed
+ok 49 - root or lock symlinks and permissive roots fail closed
+  ---
+  duration_ms: 4.603594
+  type: 'test'
+  ...
+# Subtest: nonboolean attachment permission is rejected, including string false
+ok 50 - nonboolean attachment permission is rejected, including string false
+  ---
+  duration_ms: 1.716452
+  type: 'test'
+  ...
+# Subtest: recognized job inconsistent with no prior consent fails closed before HTTP
+ok 51 - recognized job inconsistent with no prior consent fails closed before HTTP
+  ---
+  duration_ms: 0.57697
+  type: 'test'
+  ...
+# Subtest: marker preserved but body edited cannot resolve an uncertain canonical send
+ok 52 - marker preserved but body edited cannot resolve an uncertain canonical send
+  ---
+  duration_ms: 3.528578
+  type: 'test'
+  ...
+# Subtest: attachment ambiguity remains for review: content-only history cannot verify attachment bytes
+ok 53 - attachment ambiguity remains for review: content-only history cannot verify attachment bytes
+  ---
+  duration_ms: 0.630517
+  type: 'test'
+  ...
+# Subtest: closing during an outstanding notice cannot resurrect enabled consent
+ok 54 - closing during an outstanding notice cannot resurrect enabled consent
+  ---
+  duration_ms: 8.739896
+  type: 'test'
+  ...
+# Subtest: notice accepted after timeout/closure is still disabled when late acknowledgement arrives
+ok 55 - notice accepted after timeout/closure is still disabled when late acknowledgement arrives
+  ---
+  duration_ms: 14.109646
+  type: 'test'
+  ...
+# Subtest: bounded history pagination can reconcile on page two without resend
+ok 56 - bounded history pagination can reconcile on page two without resend
+  ---
+  duration_ms: 1.080476
+  type: 'test'
+  ...
+# Subtest: history exhaustion and repeated cursors are bounded and never cause resend
+ok 57 - history exhaustion and repeated cursors are bounded and never cause resend
+  ---
+  duration_ms: 3.520869
+  type: 'test'
+  ...
+# Subtest: independent sessions publish without waiting for another session HTTP response
+ok 58 - independent sessions publish without waiting for another session HTTP response
+  ---
+  duration_ms: 1.632318
+  type: 'test'
+  ...
+# Subtest: one completed inline summary has durations, safe transcript, stable nonce and no pings
+ok 59 - one completed inline summary has durations, safe transcript, stable nonce and no pings
+  ---
+  duration_ms: 3.664757
+  type: 'test'
+  ...
+# Subtest: no canonical send before session ready or while any accepted work remains
+ok 60 - no canonical send before session ready or while any accepted work remains
+  ---
+  duration_ms: 0.63035
+  type: 'test'
+  ...
+# Subtest: concurrent finalization calls share one send
+ok 61 - concurrent finalization calls share one send
+  ---
+  duration_ms: 0.336698
+  type: 'test'
+  ...
+# Subtest: durable intent failure prevents HTTP send entirely
+ok 62 - durable intent failure prevents HTTP send entirely
+  ---
+  duration_ms: 0.180392
+  type: 'test'
+  ...
+# Subtest: crash after successful remote send reconciles author and marker without resend
+ok 63 - crash after successful remote send reconciles author and marker without resend
+  ---
+  duration_ms: 2.268503
+  type: 'test'
+  ...
+# Subtest: HTTP failure/unknown delivery is held uncertain even when history is empty
+ok 64 - HTTP failure/unknown delivery is held uncertain even when history is empty
+  ---
+  duration_ms: 0.715525
+  type: 'test'
+  ...
+# Subtest: remote message accepted before network timeout is later reconciled, not duplicated
+ok 65 - remote message accepted before network timeout is later reconciled, not duplicated
+  ---
+  duration_ms: 0.526299
+  type: 'test'
+  ...
+# Subtest: a forged author or partial marker cannot resolve uncertain send
+ok 66 - a forged author or partial marker cannot resolve uncertain send
+  ---
+  duration_ms: 0.689189
+  type: 'test'
+  ...
+# Subtest: history errors never trigger a resend
+ok 67 - history errors never trigger a resend
+  ---
+  duration_ms: 0.673563
+  type: 'test'
+  ...
+# Subtest: changed payload after send intent cannot be silently republished
+ok 68 - changed payload after send intent cannot be silently republished
+  ---
+  duration_ms: 0.794908
+  type: 'test'
+  ...
+# Subtest: long output requires explicit attachment opt-in and sends no blank placeholder
+ok 69 - long output requires explicit attachment opt-in and sends no blank placeholder
+  ---
+  duration_ms: 0.765988
+  type: 'test'
+  ...
+# Subtest: result ordering is capture-time then sequence, not completion order
+ok 70 - result ordering is capture-time then sequence, not completion order
+  ---
+  duration_ms: 0.322447
+  type: 'test'
+  ...
+# Subtest: failed and cancelled work are explicit gaps with INCOMPLETE status
+ok 71 - failed and cancelled work are explicit gaps with INCOMPLETE status
+  ---
+  duration_ms: 0.191518
+  type: 'test'
+  ...
+# Subtest: nonconsenting meeting is not an empty transcript and no-observed-audio is incomplete
+ok 72 - nonconsenting meeting is not an empty transcript and no-observed-audio is incomplete
+  ---
+  duration_ms: 0.089466
+  type: 'test'
+  ...
+# Subtest: only exact no-speech jobs are labelled as silence; empty recognition is incomplete
+ok 73 - only exact no-speech jobs are labelled as silence; empty recognition is incomplete
+  ---
+  duration_ms: 0.104635
+  type: 'test'
+  ...
+# Subtest: untrusted transcript mentions, fences and controls are neutralized
+ok 74 - untrusted transcript mentions, fences and controls are neutralized
+  ---
+  duration_ms: 0.085174
+  type: 'test'
+  ...
+# Subtest: malformed session/account/job paths are rejected before publication
+ok 75 - malformed session/account/job paths are rejected before publication
+  ---
+  duration_ms: 0.186518
+  type: 'test'
+  ...
+# Subtest: notice consent, privacy, no-auto-resume and static controls; close is idempotent
+ok 76 - notice consent, privacy, no-auto-resume and static controls; close is idempotent
+  ---
+  duration_ms: 0.872081
+  type: 'test'
+  ...
+# Subtest: notice send ambiguity is reconciled without creating a second consent prompt
+ok 77 - notice send ambiguity is reconciled without creating a second consent prompt
+  ---
+  duration_ms: 0.454417
+  type: 'test'
+  ...
+# Subtest: a hung transport is bounded and late acceptance is reconciled on next call
+ok 78 - a hung transport is bounded and late acceptance is reconciled on next call
+  ---
+  duration_ms: 11.509778
+  type: 'test'
+  ...
+# Subtest: raw private PCM -> unique private 16k mono WAV -> exact pinned base.en/English/CPU4 CLI; leaves source ownership to store
+ok 79 - raw private PCM -> unique private 16k mono WAV -> exact pinned base.en/English/CPU4 CLI; leaves source ownership to store
+  ---
+  duration_ms: 4.194806
+  type: 'test'
+  ...
+# Subtest: concurrent injected recognizers use distinct anonymous inodes, never overwrite one another
+ok 80 - concurrent injected recognizers use distinct anonymous inodes, never overwrite one another
+  ---
+  duration_ms: 0.811909
+  type: 'test'
+  ...
+# Subtest: skip only exact zero/no-data; one quiet nonzero sample anywhere must run recognition
+ok 81 - skip only exact zero/no-data; one quiet nonzero sample anywhere must run recognition
+  ---
+  duration_ms: 11.198792
+  type: 'test'
+  ...
+# Subtest: reject missing/misaligned/size-mismatched/oversized/permissive/symlink/hardlink PCM before native command
+ok 82 - reject missing/misaligned/size-mismatched/oversized/permissive/symlink/hardlink PCM before native command
+  ---
+  duration_ms: 2.036606
+  type: 'test'
+  ...
+# Subtest: conversion/recognition/overflow/abort failures remove only private converted artifacts and sanitize exceptions
+ok 83 - conversion/recognition/overflow/abort failures remove only private converted artifacts and sanitize exceptions
+  ---
+  duration_ms: 7.564328
+  type: 'test'
+  ...
+# Subtest: sanitized child environment has no shell/secrets, privately bounded stdout; TERM/KILL abort awaits actual close
+ok 84 - sanitized child environment has no shell/secrets, privately bounded stdout; TERM/KILL abort awaits actual close
+  ---
+  duration_ms: 33.553412
+  type: 'test'
+  ...
+# Subtest: runtime deadline, output overflow and child error wait close rather than overlapping next native job
+ok 85 - runtime deadline, output overflow and child error wait close rather than overlapping next native job
+  ---
+  duration_ms: 113.302163
+  type: 'test'
+  ...
+# Subtest: spawn throws, pre-aborted jobs, nonzero exits and strict output cap all fail safely; 64KiB accepted
+ok 86 - spawn throws, pre-aborted jobs, nonzero exits and strict output cap all fail safely; 64KiB accepted
+  ---
+  duration_ms: 1.196445
+  type: 'test'
+  ...
+# Subtest: real child inherits an anonymous regular file via fd3, seekable across separate writer and reader processes
+ok 87 - real child inherits an anonymous regular file via fd3, seekable across separate writer and reader processes
+  ---
+  duration_ms: 38.12142
+  type: 'test'
+  ...
+# Subtest: real isolated subprocess deadline kills and waits close before returning; no bot or native recognizer launched
+ok 88 - real isolated subprocess deadline kills and waits close before returning; no bot or native recognizer launched
+  ---
+  duration_ms: 230.761087
+  type: 'test'
+  ...
+# Subtest: real ffmpeg explicit RAW s16le conversion yields 16kHz mono WAV with complete synthetic samples
+ok 89 - real ffmpeg explicit RAW s16le conversion yields 16kHz mono WAV with complete synthetic samples
+  ---
+  duration_ms: 62.545234
+  type: 'test'
+  ...
+# Subtest: one global slot across speakers/sessions; session fairness and capture-order stored output
+ok 90 - one global slot across speakers/sessions; session fairness and capture-order stored output
+  ---
+  duration_ms: 15.238334
+  type: 'test'
+  ...
+# Subtest: timeout requests abort but NEVER releases native slot until the recognizer settles
+ok 91 - timeout requests abort but NEVER releases native slot until the recognizer settles
+  ---
+  duration_ms: 30.623932
+  type: 'test'
+  ...
+# Subtest: drain cancellation durably accounts queued and active jobs, ignores late text, and holds global slot
+ok 92 - drain cancellation durably accounts queued and active jobs, ignores late text, and holds global slot
+  ---
+  duration_ms: 3.888778
+  type: 'test'
+  ...
+# Subtest: shutdown awaits abort close, checkpoints running as queued and does not drain backlog
+ok 93 - shutdown awaits abort close, checkpoints running as queued and does not drain backlog
+  ---
+  duration_ms: 4.540506
+  type: 'test'
+  ...
+# Subtest: recognizer failure, no-speech, invalid/oversized output and total text cap are terminal and sanitized
+ok 94 - recognizer failure, no-speech, invalid/oversized output and total text cap are terminal and sanitized
+  ---
+  duration_ms: 3.295765
+  type: 'test'
+  ...
+# Subtest: empty model output on nonzero or quiet PCM is incomplete, never mislabeled exact-zero no-speech
+ok 95 - empty model output on nonzero or quiet PCM is incomplete, never mislabeled exact-zero no-speech
+  ---
+  duration_ms: 2.905812
+  type: 'test'
+  ...
+# Subtest: failed durable terminal write pauses scheduler without deleting source or launching another recognizer
+ok 96 - failed durable terminal write pauses scheduler without deleting source or launching another recognizer
+  ---
+  duration_ms: 1.610108
+  type: 'test'
+  ...
+# [dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+# Subtest: awaits async checkpoint/release before destroy; duplicate signals share shutdown
+ok 97 - awaits async checkpoint/release before destroy; duplicate signals share shutdown
+  ---
+  duration_ms: 2.105613
+  type: 'test'
+  ...
+# Subtest: hung cleanup has a global deadline, destroys client, exits nonzero
+ok 98 - hung cleanup has a global deadline, destroys client, exits nonzero
+  ---
+  duration_ms: 16.636714
+  type: 'test'
+  ...
+# Subtest: cleanup rejection is handled, remaining callbacks awaited, no private error logged
+ok 99 - cleanup rejection is handled, remaining callbacks awaited, no private error logged
+  ---
+  duration_ms: 0.471752
+  type: 'test'
+  ...
+# Subtest: client destruction itself is bounded by the same deadline
+ok 100 - client destruction itself is bounded by the same deadline
+  ---
+  duration_ms: 11.432813
+  type: 'test'
+  ...
+# Subtest: separate writer process SIGKILL leaves durable open/queued/running/result records recoverable without its memory
+ok 101 - separate writer process SIGKILL leaves durable open/queued/running/result records recoverable without its memory
+  ---
+  duration_ms: 33.416775
+  type: 'test'
+  ...
+# Subtest: startup preserves validated flock inode and removes only exact validated conversion crash namespace
+ok 102 - startup preserves validated flock inode and removes only exact validated conversion crash namespace
+  ---
+  duration_ms: 6.521231
+  type: 'test'
+  ...
+# Subtest: startup refuses conversion/lock symlinks and linked or loose metadata rather than following them
+ok 103 - startup refuses conversion/lock symlinks and linked or loose metadata rather than following them
+  ---
+  duration_ms: 2.22179
+  type: 'test'
+  ...
+# Subtest: failed append AND failed rollback quarantine new writes and count uncertain physical spool until terminal cleanup
+ok 104 - failed append AND failed rollback quarantine new writes and count uncertain physical spool until terminal cleanup
+  ---
+  duration_ms: 1.08135
+  type: 'test'
+  ...
+# Subtest: JSON file and parent directory are fsynced; rename failure preserves previous record and removes temporary output
+ok 105 - JSON file and parent directory are fsynced; rename failure preserves previous record and removes temporary output
+  ---
+  duration_ms: 1.281036
+  type: 'test'
+  ...
+# Subtest: private root/file ownership, mode, symlink and filename gates; contract defaults
+not ok 106 - private root/file ownership, mode, symlink and filename gates; contract defaults
+  ---
+  duration_ms: 2.521359
+  type: 'test'
+  location: '/app/test/local-transcription/store.test.js:15:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected exception.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  operator: 'throws'
+  stack: |-
+    TestContext.<anonymous> (/app/test/local-transcription/store.test.js:17:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: job metadata precedes audio creation; accepted append is fsynced without rewriting historical JSON
+ok 107 - job metadata precedes audio creation; accepted append is fsynced without rewriting historical JSON
+  ---
+  duration_ms: 3.873652
+  type: 'test'
+  ...
+# Subtest: restart recovers open PCM from actual aligned length, requeues queued/running, retains terminal text
+ok 108 - restart recovers open PCM from actual aligned length, requeues queued/running, retains terminal text
+  ---
+  duration_ms: 10.413343
+  type: 'test'
+  ...
+# Subtest: missing, unaligned and changed sealed PCM become explicit durable failures and are removed
+ok 109 - missing, unaligned and changed sealed PCM become explicit durable failures and are removed
+  ---
+  duration_ms: 5.264906
+  type: 'test'
+  ...
+# Subtest: terminal output commits before PCM unlink; restart idempotently cleans terminal PCM
+ok 110 - terminal output commits before PCM unlink; restart idempotently cleans terminal PCM
+  ---
+  duration_ms: 1.77204
+  type: 'test'
+  ...
+# Subtest: failed result commit never removes PCM; fsync failure is not accepted and rollback preserves old prefix
+ok 111 - failed result commit never removes PCM; fsync failure is not accepted and rollback preserves old prefix
+  ---
+  duration_ms: 1.627485
+  type: 'test'
+  ...
+# Subtest: global spool/queue/utterance/transcript/record caps reject rather than silently exceed
+ok 112 - global spool/queue/utterance/transcript/record caps reject rather than silently exceed
+  ---
+  duration_ms: 1.27166
+  type: 'test'
+  ...
+# Subtest: publisher shallow patches preserve coordinator fields and transcript sorting is capture-time then allocation
+ok 113 - publisher shallow patches preserve coordinator fields and transcript sorting is capture-time then allocation
+  ---
+  duration_ms: 1.067975
+  type: 'test'
+  ...
+# Subtest: retention deletes expired ready/published metadata, never active or pending PCM; session cap is explicit
+ok 114 - retention deletes expired ready/published metadata, never active or pending PCM; session cap is explicit
+  ---
+  duration_ms: 8.003911
+  type: 'test'
+  ...
+# Subtest: corrupt bounded metadata and orphan files fail startup closed, not silently discarded
+ok 115 - corrupt bounded metadata and orphan files fail startup closed, not silently discarded
+  ---
+  duration_ms: 0.882582
+  type: 'test'
+  ...
+1..115
+# tests 115
+# suites 0
+# pass 114
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 562.895977

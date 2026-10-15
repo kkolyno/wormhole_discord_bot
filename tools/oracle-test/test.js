@@ -22,7 +22,7 @@ class DiscordAdapter extends EventEmitter {
     this.client.on(Events.ShardReconnecting, () => this.emit('fault', 'GATEWAY_RECONNECT'));
     this.client.on(Events.InteractionCreate, i => this.emit('interaction', i));
     this.client.on(Events.VoiceStateUpdate, (old, next) => {
-      if (!this.connection) return;
+      if (!this.connection || this.disconnecting) return;
       if (next.id === this.owner && next.channelId !== cfg.channel) this.emit('fault', 'CONSENTING_USER_LEFT');
       if (next.id === this.client.user.id && (next.channelId !== cfg.channel || next.serverDeaf || next.selfDeaf))
         this.emit('fault', 'BOT_MOVED_OR_DEAFENED');
@@ -47,7 +47,7 @@ class DiscordAdapter extends EventEmitter {
   ack(i, content) { return bounded(i.reply({ content, flags: 64, allowedMentions: { parse: [] } }), 3000); }
   async inVoice(id) { return this.guild.voiceStates.cache.get(id)?.channelId === this.config.channel; }
   async join(owner, signal) {
-    signal.throwIfAborted(); this.owner = owner;
+    signal.throwIfAborted(); this.owner = owner; this.disconnecting = false;
     const { joinVoiceChannel, entersState, VoiceConnectionStatus: S } = this.voice;
     this.connection = joinVoiceChannel({ guildId: this.config.guild, channelId: this.config.channel,
       adapterCreator: this.guild.voiceAdapterCreator, selfDeaf: false, selfMute: true });

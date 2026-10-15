@@ -1,0 +1,12 @@
+{
+  "source": "Allowlisted private one-shot outcome metadata read by the operator; no audio or transcript copied",
+  "finishedAt": "2026-10-15T21:06:47.739Z",
+  "durationMs": 30000.856018999995,
+  "acceptedPcmBytes": 3271680,
+  "jobs": 4,
+  "outcome": "incomplete",
+  "reason": "duration_limit",
+  "issues": ["BOT_MOVED_OR_DEAFENED"],
+  "userFeedback": "The transcription looks really good and basically realtime",
+  "interpretation": "Actual Discord audio was received/decoded and the user evaluated the posted transcript positively. This is one short microphone case, not a sustained or multi-speaker benchmark. The prototype's VoiceStateUpdate listener did not guard intentional disconnect; new code includes a regression for that teardown false-fault path. Do not rewrite the observed outcome as fully complete."
+}

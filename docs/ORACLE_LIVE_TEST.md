@@ -1,5 +1,20 @@
 # Authorized Oracle one-shot microphone test
 
+## Later microphone outcome and guarded integration
+
+The fresh 21:06 UTC run captured approximately 30 seconds, 3,271,680 PCM bytes and
+four recognition jobs; it finished at `2026-10-15T21:06:47.739Z`. The user reported
+very good, basically realtime transcription. The recorded outcome is still
+`incomplete` with `BOT_MOVED_OR_DEAFENED`: the prototype lacked a guard around
+intentional disconnect. That guard now has a regression; historical evidence was
+not changed. Only bounded metadata was read, not private speech.
+
+A subsequent opt-in durable meeting feature is implemented and tested but **not
+published/deployed**. See [`LOCAL_TRANSCRIPTION.md`](LOCAL_TRANSCRIPTION.md) and
+[`LOCAL_TRANSCRIPTION_RESULTS.md`](LOCAL_TRANSCRIPTION_RESULTS.md). That later
+feature deliberately extends root wiring/dependencies; the preservation claims
+below describe the earlier one-shot runtime, not all later feature-branch work.
+
 ## Scope and rollback
 
 The user authorized experimenting with live **Oracle** on a new branch, provided
@@ -9,9 +24,11 @@ not the durable meeting-transcription integration.
 
 - Feature branch: `feat/rk3588-local-transcription`.
 - Remote rollback branch: `rollback/oracle-before-transcription` at `af358a4`.
-- `main`, original `Dockerfile`, root dependencies and all original application
-  source remain unchanged. The 20 deployed application/package files were checked
-  against the original checkout by SHA-256.
+- At the one-shot stage, `main`, original `Dockerfile`, root dependencies and
+  original application source were unchanged. The 20 deployed application/package
+  files were checked against the original checkout by SHA-256. Later guarded
+  integration extends root wiring/dependencies while retaining main, original
+  meeting-feature sources, original Dockerfile and exact-image rollback.
 - Original exact local image:
   `sha256:b44105db8c52b15918f068653f0c52eaa2d1c2e70cfc0220a2e3b72b9d379edc`.
   It is retained under the fixed local tag

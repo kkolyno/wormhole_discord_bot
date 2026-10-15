@@ -1,0 +1,8 @@
+test_pinned_cpu_build_and_safe_default (__main__.ImageContract.test_pinned_cpu_build_and_safe_default) ... ok
+test_single_opt_in_feature_branch_test_publisher (__main__.ImageContract.test_single_opt_in_feature_branch_test_publisher) ... ok
+test_verify_before_model_or_source_use (__main__.ImageContract.test_verify_before_model_or_source_use) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.001s
+
+OK

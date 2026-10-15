@@ -1,0 +1,3 @@
+actionlint 1.7.7 linux/arm64
+Archive SHA-256: 401942f9c24ed71e4fe71b76c7d638f66d8633575c4016efd2977ce7c28317d0
+Exit code: 0
