@@ -1,0 +1,117 @@
+{
+  "architecture": "arm64",
+  "codecPreflight": {
+    "arch": "arm64",
+    "caveat": "No Discord login, receive, decryption, hardware performance, or STT verification.",
+    "dave": {
+      "implementation": "unknown",
+      "moduleLoaded": true,
+      "receiveDecryptVerified": false,
+      "sessionApiAvailable": true,
+      "version": "0.1.12"
+    },
+    "mode": "offline_preflight",
+    "node": "v22.22.0",
+    "opus": {
+      "choice": "opusscript WASM",
+      "decoderConstructed": true,
+      "nativeAddonUsed": false
+    },
+    "platform": "linux",
+    "transport": {
+      "aes256gcmAvailable": true,
+      "negotiatedModeVerified": false,
+      "xchachaFallbackInstalled": false
+    },
+    "versions": {
+      "@discordjs/voice": "0.19.2",
+      "@snazzah/davey": "0.1.12",
+      "discord.js": "14.27.0",
+      "opusscript": "0.0.8",
+      "prism-media": "1.3.5"
+    }
+  },
+  "cpuCount": 8,
+  "cpuModels": [
+    "Cortex-A55"
+  ],
+  "final": {
+    "freeMemoryBytes": 4319768576,
+    "temperatures": [
+      {
+        "celsius": 51.769,
+        "type": "soc-thermal"
+      },
+      {
+        "celsius": 51.769,
+        "type": "bigcore0-thermal"
+      },
+      {
+        "celsius": 51.769,
+        "type": "bigcore1-thermal"
+      },
+      {
+        "celsius": 51.769,
+        "type": "littlecore-thermal"
+      },
+      {
+        "celsius": 49.923,
+        "type": "center-thermal"
+      },
+      {
+        "celsius": 49.923,
+        "type": "gpu-thermal"
+      },
+      {
+        "celsius": 50.846,
+        "type": "npu-thermal"
+      }
+    ]
+  },
+  "fixtureSha256": "59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e",
+  "fullFixtureText": "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+  "fullFixtureWallMs": 7150,
+  "initial": {
+    "freeMemoryBytes": 4300382208,
+    "temperatures": [
+      {
+        "celsius": 47.153,
+        "type": "soc-thermal"
+      },
+      {
+        "celsius": 47.153,
+        "type": "bigcore0-thermal"
+      },
+      {
+        "celsius": 47.153,
+        "type": "bigcore1-thermal"
+      },
+      {
+        "celsius": 47.153,
+        "type": "littlecore-thermal"
+      },
+      {
+        "celsius": 46.23,
+        "type": "center-thermal"
+      },
+      {
+        "celsius": 46.23,
+        "type": "gpu-thermal"
+      },
+      {
+        "celsius": 46.23,
+        "type": "npu-thermal"
+      }
+    ]
+  },
+  "kind": "public_fixture_only_not_call_accuracy",
+  "limits": "One short public clip; not sustained, multi-speaker, DAVE receive, or microphone accuracy evidence.",
+  "memoryPeakBytes": 325345280,
+  "modelSha256": "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002",
+  "node": "v22.22.0",
+  "warmHelperAudioSeconds": 8,
+  "warmHelperRealTimeFactor": 0.808,
+  "warmHelperText": "And so my fellow Americans, ask not what your country can do for you.",
+  "warmHelperWallMs": 6460,
+  "checkerSha256": "cf77589cd44b3ab523f495217a01e43b9f992cad8f1a6294531ad658bd51faac"
+}

@@ -27,6 +27,9 @@ REPOSITORY = "ghcr.io/kkolyno/wormhole_discord_bot"
 VOLUME = "oracle-transcription-data"
 DATA_DIR = "/data/oracle-test"  # tools/oracle-test/config.js's exact allowlisted path.
 BOOT = ["node", "tools/oracle-test/boot.js", "--authorized-live-oracle-test"]
+# OMV coerces JSON-shaped request values into structured data before string
+# validation. A YAML comment keeps this field text; the following JSON is YAML.
+OVERRIDE_COMMENT = "# Oracle controlled override: retain as YAML text in OMV RPC.\n"
 IMAGE_RE = re.compile(re.escape(REPOSITORY) + r":oracle-test-[0-9a-f]{40}\Z")
 ID_RE = re.compile(r"sha256:[0-9a-f]{64}\Z")
 ACTIONS = ("snapshot", "resume-snapshot", "status", "pin-rollback", "prepare-test", "pull-test",
@@ -492,7 +495,7 @@ class Admin:
                         and not v["target"].startswith("/data/")
                         for v in service.get("volumes", [])), "existing_data_mount_requires_manual_plan")
         desired = copy.deepcopy(saved["file"])
-        desired["override"] = json.dumps({"services": {SERVICE: {
+        desired["override"] = OVERRIDE_COMMENT + json.dumps({"services": {SERVICE: {
             "image": test_image(image), "command": BOOT, "environment": {"DATA_DIR": DATA_DIR},
             "volumes": [{"type": "volume", "source": VOLUME, "target": "/data"}]}},
             "volumes": {VOLUME: {"name": VOLUME}}}, sort_keys=True)
@@ -577,7 +580,7 @@ class Admin:
         self.verify_pin(saved)
         require(not saved["file"]["override"].strip(), "nonempty_override_requires_manual_plan")
         pinned = copy.deepcopy(saved["file"])
-        pinned["override"] = json.dumps({"services": {SERVICE: {"image": saved["old_id"]}}}, sort_keys=True)
+        pinned["override"] = OVERRIDE_COMMENT + json.dumps({"services": {SERVICE: {"image": saved["old_id"]}}}, sort_keys=True)
         allowed = [saved["file"], pinned]
         if self.store.has("prepared-file.json"):
             allowed.append(self.store.get("prepared-file.json")["file"])

@@ -105,7 +105,9 @@ and automated rollback require the original override to be empty/whitespace.
 A nonempty Compose entrypoint can be captured/compared read-only but still blocks
 test preparation, preserving the reviewed boot-command boundary.
 The original source YAML is never parsed or rewritten. Preparation sends the full
-captured object to `Compose.setFile`, changing **only its override string** to JSON
+captured object to `Compose.setFile`, changing **only its override string** to a
+YAML-comment-prefixed JSON document (the comment prevents OMV from coercing the
+string to an object before schema validation)
 (valid Compose YAML). It preserves the original body, env, metadata, and booleans.
 It does not append YAML documents or attempt an unsafe hand-written YAML merge.
 
@@ -289,7 +291,8 @@ docker exec -w /ws cd6db7666af27e18b39eaf12dcb3b95961ea743b681974b438f83ce61a4ab
   python3 -B scripts/oracle-transcription-admin.py --help
 ```
 
-Corrective verification results: **37 fake tests passed** (`Ran 37 tests in
+Corrective verification results: **38 fake tests passed** (including empty default
+IPAM normalization and the OMV JSON-string wire guard; final rerun `Ran 38 tests in
 5.296s`, `OK`); CLI `--help` exited **0** and displayed only the bounded arguments.
 Both commands ran in the container above. CLI help does not load credentials or
 log in. No live deployment/API verification or production snapshot was performed.

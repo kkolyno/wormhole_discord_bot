@@ -59,7 +59,7 @@ class FakeOMV:
     def config(self):
         result = copy.deepcopy(self.base_config)
         if self.file["override"].strip():
-            override = json.loads(self.file["override"])
+            override = json.loads(self.file["override"].removeprefix(admin.OVERRIDE_COMMENT))
             for name, changes in override.get("services", {}).items():
                 for key, value in changes.items():
                     target = result["services"][name]
@@ -95,6 +95,15 @@ class FakeOMV:
                 "NetworkSettings": {"Networks": {"bot-stack_default": {}}},
                 "State": {"Running": self.running}, "Secret": SECRET}
 
+    @staticmethod
+    @contextlib.contextmanager
+    def _json_string_must_not_decode():
+        try:
+            yield
+        except json.JSONDecodeError:
+            return
+        raise AssertionError("Override would be coerced to structured data by OMV")
+
     def rpc(self, service, method, params):
         self.calls.append((service, method, copy.deepcopy(params)))
         if (service, method) == ("Compose", "getFile"):
@@ -103,6 +112,12 @@ class FakeOMV:
         if (service, method) == ("Compose", "setFile"):
             assert set(params) == admin.FILE_FIELDS
             assert params["uuid"] == admin.STACK_UUID
+            # OMV recursively decodes JSON-shaped string fields before schema
+            # validation: our YAML comment must prevent override becoming an object.
+            if params["override"]:
+                assert params["override"].startswith(admin.OVERRIDE_COMMENT)
+                with self._json_string_must_not_decode():
+                    json.loads(params["override"])
             self.file = copy.deepcopy(params)
             return copy.deepcopy(self.file)
         if (service, method) == ("Exec", "getOutput"):
@@ -388,7 +403,8 @@ class AdminTests(unittest.TestCase):
         result = self.run_cli("rollback", ["--authorize-live-change"], expected=1)
         self.assertEqual(result["code"], "old_container_restored_source_stays_pinned_tag_drift")
         self.assertEqual(self.fake.running_id, OLD)
-        self.assertEqual(json.loads(self.fake.file["override"])["services"][admin.SERVICE]["image"], OLD)
+        self.assertEqual(json.loads(self.fake.file["override"].removeprefix(
+            admin.OVERRIDE_COMMENT))["services"][admin.SERVICE]["image"], OLD)
 
     def test_changed_rollback_tag_or_source_refuses_mutation(self):
         instance = self.pinned()
