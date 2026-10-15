@@ -69,6 +69,20 @@ must not be copied to agent workspaces. The test resumes unchanged legacy
 `index.js` after bounded cleanup or idle expiry; it does not enable automatic
 transcripts in ordinary meeting summaries. Restart does not rearm the one-shot.
 
+**21:06 UTC update:** The first window expired at 20:43 UTC with `not_recorded`,
+`arming_expired`, no consenting account and zero PCM. After the user explicitly
+replied “ready”, the operator stopped Oracle, verified the private outcome had
+zero PCM/jobs/issues and only its two metadata files remained, archived that
+expired directory under `/data/oracle-test-expired-20261015210556`, and created a
+fresh private test directory. The same verified image was recreated; no code,
+image, or Compose source change was needed. Audit records are in the existing
+private journal with prefix `rearm-20261015210556`.
+Fresh enabled notice (verified through Discord), expires **21:16:05 UTC**:
+https://discord.com/channels/1465125548379607094/1465216403241041981/1560398382244036720
+The old notice remains disabled. No new consent/capture outcome has been observed.
+Do not repeat this reset on any nonempty/ambiguous run; rearming required the
+user's fresh readiness and explicit zero-audio expiry checks with the service stopped.
+
 ## User's clarified goal
 
 - The bot listens to calls in the configured Discord voice channel.
