@@ -1,0 +1,51 @@
+whisper_init_from_file_with_params_no_state: loading model from '/ws/experiments/whisper-smoke/artifacts/ggml-base.bin'
+whisper_init_with_params_no_state: use gpu    = 0
+whisper_init_with_params_no_state: flash attn = 1
+whisper_init_with_params_no_state: gpu_device = 0
+whisper_init_with_params_no_state: dtw        = 0
+whisper_init_with_params_no_state: devices    = 1
+whisper_init_with_params_no_state: backends   = 1
+whisper_model_load: loading model
+whisper_model_load: n_vocab       = 51865
+whisper_model_load: n_audio_ctx   = 1500
+whisper_model_load: n_audio_state = 512
+whisper_model_load: n_audio_head  = 8
+whisper_model_load: n_audio_layer = 6
+whisper_model_load: n_text_ctx    = 448
+whisper_model_load: n_text_state  = 512
+whisper_model_load: n_text_head   = 8
+whisper_model_load: n_text_layer  = 6
+whisper_model_load: n_mels        = 80
+whisper_model_load: ftype         = 1
+whisper_model_load: qntvr         = 0
+whisper_model_load: type          = 2 (base)
+whisper_model_load: adding 1608 extra tokens
+whisper_model_load: n_langs       = 99
+whisper_model_load:          CPU total size =   147.37 MB
+whisper_model_load: model size    =  147.37 MB
+whisper_backend_init_gpu: no GPU found
+whisper_init_state: kv self size  =    6.29 MB
+whisper_init_state: kv cross size =   18.87 MB
+whisper_init_state: kv pad  size  =    3.15 MB
+whisper_init_state: compute buffer (conv)   =   16.28 MB
+whisper_init_state: compute buffer (encode) =   23.09 MB
+whisper_init_state: compute buffer (cross)  =    4.66 MB
+whisper_init_state: compute buffer (decode) =   96.37 MB
+read_audio_data: reading audio data from '/ws/experiments/whisper-smoke/artifacts/run-20261015T192903Z-b6hYGwet/whisper.cpp-d1be6fde11ac6e0407606b4e42fe72d34add8037/samples/jfk.wav' ...
+read_audio_data: trying to decode with miniaudio
+
+system_info: n_threads = 4 / 18 | WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : NEON = 1 | ARM_FMA = 1 | REPACK = 1 | 
+
+main: processing '/ws/experiments/whisper-smoke/artifacts/run-20261015T192903Z-b6hYGwet/whisper.cpp-d1be6fde11ac6e0407606b4e42fe72d34add8037/samples/jfk.wav' (176000 samples, 11.0 sec), 4 threads, 1 processors, 5 beams + best of 5, lang = en, task = transcribe, timestamps = 1 ...
+
+output_txt: saving output to '/ws/experiments/whisper-smoke/reproduction-evidence/run-20261015T192903Z-b6hYGwet/transcript.txt'
+
+whisper_print_timings:     load time =    44.62 ms
+whisper_print_timings:     fallbacks =   0 p /   0 h
+whisper_print_timings:      mel time =     4.59 ms
+whisper_print_timings:   sample time =    58.86 ms /   137 runs (     0.43 ms per run)
+whisper_print_timings:   encode time =  1232.74 ms /     1 runs (  1232.74 ms per run)
+whisper_print_timings:   decode time =    10.10 ms /     2 runs (     5.05 ms per run)
+whisper_print_timings:   batchd time =   502.59 ms /   133 runs (     3.78 ms per run)
+whisper_print_timings:   prompt time =     0.00 ms /     1 runs (     0.00 ms per run)
+whisper_print_timings:    total time =  1875.57 ms

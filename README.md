@@ -2,16 +2,31 @@
 
 A Discord bot that detects when people join a voice channel and prompts for meeting notes using [NotesBot](https://notesbot.app/). Designed for one-click deployment via Portainer/OMV using a prebuilt GHCR image.
 
+## Local Transcription Work — Start Here
+
+See [HANDOFF.md](HANDOFF.md) for the current requirements and next steps for robust
+RK3588 call transcription. The previous transcription plan was rejected and removed.
+**Transcription is not implemented yet.** The behavior below describes the legacy
+NotesBot-helper code, not the intended transcription feature.
+
+## Existing Oracle Deployment
+
+For recorded OMV deployment context, read-only management commands, and the
+production update procedure, see [DEPLOYMENT.md](DEPLOYMENT.md). Recheck live status
+before relying on historical observations; the local Compose file is not the
+production stack.
+Local credentials are kept in Git-ignored `.private/omv.json` and `.env.local`;
+never commit them or run a duplicate bot using the production token.
+
 ## Features
 
 - 🎙️ **Voice Channel Monitoring** - Detects when humans join a specific voice channel
 - 📋 **One-Click Prompts** - Posts a "Meeting detected" message with Start/No buttons
 - 🤖 **NotesBot Integration** - Guides users to run NotesBot commands (`/join` and `/leave`)
-- 🔄 **Anti-Spam Protection** - Grace timer prevents duplicate prompts during brief disconnects
+- 🔄 **Prompt Grace Timer** - Delays session reset; see current lifecycle limitations below
 - 📝 **Discord Logging** - Optional log channel for monitoring bot activity and errors
-- 🛡️ **Graceful Failure** - Robust error handling keeps the bot running even when issues occur
-- 🔌 **Restart Recovery** - Detects users already in voice channel on bot restart
-- 🐳 **Docker-First** - No filesystem mounts needed, runs entirely from environment variables
+- 🔌 **Startup Occupancy Check** - Posts a fresh prompt when humans are present; does not restore a previous session
+- 🐳 **Docker Deployment** - Current helper uses environment variables and in-memory state; durable transcription storage is not implemented
 
 ## Quick Start (Portainer)
 
@@ -26,6 +41,7 @@ A Discord bot that detects when people join a voice channel and prompts for meet
 | Variable | Description |
 |----------|-------------|
 | `DISCORD_TOKEN` | Bot token from Discord Developer Portal |
+| `CLIENT_ID` | Bot application/client ID |
 | `GUILD_ID` | Discord server (guild) ID |
 | `VOICE_CHANNEL_ID` | Voice channel ID to monitor |
 | `ALERTS_CHANNEL_ID` | Text channel ID for meeting prompts (tags users in VC) |
@@ -36,8 +52,8 @@ A Discord bot that detects when people join a voice channel and prompts for meet
 |----------|---------|-------------|
 | `PING_ROLE_ID` | - | Role ID to mention in prompts |
 | `LOG_CHANNEL_ID` | - | Text channel ID for bot logs (errors, status updates) |
-| `EMPTY_GRACE_SECONDS` | `90` | Seconds to wait before resetting after channel empties |
-| `JOIN_GRACE_SECONDS` | `15` | Seconds to wait after first join before posting prompt |
+| `EMPTY_GRACE_SECONDS` | `90` | Grace timer duration; current code starts it at one or zero humans and checks for emptiness on expiry |
+| `JOIN_GRACE_SECONDS` | `15` | Legacy setting; the join-grace timer is not invoked by the current voice handler |
 | `NOTESBOT_START_COMMAND` | `/join` | Command to start NotesBot recording |
 | `NOTESBOT_STOP_COMMAND` | `/leave` | Command to stop NotesBot and generate notes |
 | `NOTES_START_HINT` | - | Custom message for "notes started" follow-up |
@@ -88,6 +104,7 @@ services:
     environment:
       # Required
       - DISCORD_TOKEN=your_bot_token_here
+      - CLIENT_ID=123456789012345678
       - GUILD_ID=123456789012345678
       - VOICE_CHANNEL_ID=123456789012345678
       - ALERTS_CHANNEL_ID=123456789012345678
@@ -107,30 +124,22 @@ Replace:
 
 ## How It Works
 
-### Session State Machine
+### Current Legacy Behavior
 
-```
-┌─────────────┐     Human joins     ┌─────────────┐
-│  INACTIVE   │ ─────────────────▶ │  PROMPTED   │
-│             │                     │             │
-│  (waiting)  │ ◀───────────────── │  (active)   │
-└─────────────┘   Grace expires    └─────────────┘
-                  & channel empty
-```
+1. While inactive, a voice update with two or more humans triggers a meeting prompt.
+   Startup also posts a fresh prompt if any humans are already present. A lone join
+   during normal operation does not invoke the unused join-grace timer.
+2. **Start Notes** provides instructions for manually running NotesBot commands;
+   this bot does not start recording. **No** declines the prompt, and **Wait for
+   More** waits for another join before prompting again.
+3. For prompted/waiting sessions, dropping to one or zero humans starts the grace
+   timer. At expiry, a zero-human result triggers the participant-duration summary
+   and reset. This is not necessarily a full grace interval after the last leave.
+4. Session state and participant tracking are in memory and are lost on restart.
 
-1. **INACTIVE**: Bot is waiting for humans to join the voice channel
-2. **PROMPTED**: A prompt has been posted; no new prompts until session resets
-3. **Grace Timer**: When all humans leave, waits 90s (configurable) before resetting
-
-### User Flow
-
-1. First human joins the monitored voice channel
-2. Bot posts "Meeting detected" prompt with **Start Notes** and **No** buttons
-3. User clicks a button:
-   - **Start Notes**: Bot posts instructions to run `/join` and `/leave`
-   - **No**: Bot acknowledges and waits
-4. When all humans leave and grace period expires, session resets
-5. Next human to join triggers a new prompt
+Known timer, concurrency, fetch-failure, and shutdown limitations are documented
+in [HANDOFF.md](HANDOFF.md). This lifecycle must be reviewed before adding capture
+and durable transcript publication.
 
 ## Local Development
 
@@ -138,8 +147,9 @@ Replace:
 # Install dependencies
 npm install
 
-# Set environment variables
-export DISCORD_TOKEN=your_token
+# Use a separate development bot, never a duplicate production instance.
+export DISCORD_TOKEN=your_development_token
+export CLIENT_ID=your_client_id
 export GUILD_ID=your_guild_id
 export VOICE_CHANNEL_ID=your_voice_channel_id
 export ALERTS_CHANNEL_ID=your_alerts_channel_id
@@ -154,6 +164,7 @@ npm start
 docker build -t meeting-helper-bot .
 
 docker run -e DISCORD_TOKEN=xxx \
+  -e CLIENT_ID=xxx \
   -e GUILD_ID=xxx \
   -e VOICE_CHANNEL_ID=xxx \
   -e ALERTS_CHANNEL_ID=xxx \

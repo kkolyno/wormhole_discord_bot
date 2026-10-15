@@ -1,0 +1,17 @@
+[
+  "/ws/experiments/whisper-smoke/artifacts/run-20261015T192903Z-b6hYGwet/build/bin/whisper-cli",
+  "-m",
+  "/ws/experiments/whisper-smoke/artifacts/ggml-base.bin",
+  "-f",
+  "/ws/experiments/whisper-smoke/artifacts/run-20261015T192903Z-b6hYGwet/whisper.cpp-d1be6fde11ac6e0407606b4e42fe72d34add8037/samples/jfk.wav",
+  "-t",
+  "4",
+  "-p",
+  "1",
+  "-l",
+  "en",
+  "-ng",
+  "-otxt",
+  "-of",
+  "/ws/experiments/whisper-smoke/reproduction-evidence/run-20261015T192903Z-b6hYGwet/transcript"
+]

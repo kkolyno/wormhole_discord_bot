@@ -1,0 +1,1 @@
+sha256:e49e898af15ab0830a05540e064383e96c81531fc876224ece7785cf2d470a2b linux/arm64 user=nodejs cmd=["node","index.js"]

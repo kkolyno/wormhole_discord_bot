@@ -1,0 +1,13 @@
+{
+  "bash_syntax_exit_code": 0,
+  "full_script_exit_code": 0,
+  "build_exit_code": 0,
+  "inference_exit_code": 0,
+  "fresh_source_build_evidence_paths": true,
+  "source_archive_members_byte_identical": 2039,
+  "compile_commands_from_fresh_source": 43,
+  "fresh_transcript_output": true,
+  "original_transcript_byte_identical": true,
+  "input_hashes_identical": true,
+  "original_and_earlier_replay_evidence_files_unchanged": 48
+}

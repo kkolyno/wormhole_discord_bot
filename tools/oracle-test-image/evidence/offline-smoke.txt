@@ -1,0 +1,479 @@
+
+== Runtime versions (container kernel is NOT the target RK3588) ==
+v22.22.0
+10.9.4
+3.23.3
+Linux 7.0.14-orbstack-00380-ga7e0a2dc9535 aarch64
+ffmpeg version 8.0.1 Copyright (c) 2000-2025 the FFmpeg developers
+built with gcc 15.2.0 (Alpine 15.2.0)
+configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharfbuzz --enable-libjxl --enable-libmp3lame --enable-libopenmpt --enable-libopus --enable-libplacebo --enable-libpulse --enable-librav1e --enable-librist --enable-libshaderc --enable-libsoxr --enable-libsrt --enable-libssh --enable-libtheora --enable-libv4l2 --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxcb --enable-libxml2 --enable-libxvid --enable-libzimg --enable-libzmq --enable-lto=auto --enable-lv2 --enable-openssl --enable-pic --enable-pthreads --enable-shared --enable-vaapi --enable-vdpau --enable-version3 --enable-vulkan --optflags=-O3 --enable-libsvtav1
+libavutil      60.  8.100 / 60.  8.100
+libavcodec     62. 11.100 / 62. 11.100
+libavformat    62.  3.100 / 62.  3.100
+libavdevice    62.  1.100 / 62.  1.100
+libavfilter    11.  4.100 / 11.  4.100
+libswscale      9.  1.100 /  9.  1.100
+libswresample   6.  1.100 /  6.  1.100
+
+Exiting with exit code 0
+
+== Build versions ==
+gcc (Alpine 15.2.0) 15.2.0
+Copyright (C) 2025 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+g++ (Alpine 15.2.0) 15.2.0
+Copyright (C) 2025 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+cmake version 4.1.3
+
+CMake suite maintained and supported by Kitware (kitware.com/cmake).
+3.23.3
+
+== Shared library resolution ==
+	/lib/ld-musl-aarch64.so.1 (0xffff98620000)
+	libwhisper.so.1 => /usr/local/lib/libwhisper.so.1 (0xffff984ad000)
+	libggml.so.0 => /usr/local/lib/libggml.so.0 (0xffff9848c000)
+	libstdc++.so.6 => /usr/lib/libstdc++.so.6 (0xffff981c7000)
+	libgcc_s.so.1 => /usr/lib/libgcc_s.so.1 (0xffff98196000)
+	libc.musl-aarch64.so.1 => /lib/ld-musl-aarch64.so.1 (0xffff98620000)
+	libggml-base.so.0 => /usr/local/lib/libggml-base.so.0 (0xffff980c5000)
+	libggml-cpu.so.0 => /usr/local/lib/libggml-cpu.so.0 (0xffff97f54000)
+
+== Verify English model before use ==
+/opt/models/ggml-base.en.bin: OK
+
+== Runtime package versions ==
+wormhole-discord-bot@2.0.0 /app
++-- discord.js@14.25.1
+`-- dotenv@17.2.3
+
+rk3588-receive-feasibility@0.0.0 /app/tools/feasibility
++-- @discordjs/voice@0.19.2
++-- @snazzah/davey@0.1.12
++-- discord.js@14.27.0
++-- opusscript@0.0.8
+`-- prism-media@1.3.5
+
+
+== Offline DAVE API / Opus WASM preflight (not receive/decryption proof) ==
+{
+  "mode": "offline_preflight",
+  "node": "v22.22.0",
+  "platform": "linux",
+  "arch": "arm64",
+  "versions": {
+    "@discordjs/voice": "0.19.2",
+    "@snazzah/davey": "0.1.12",
+    "discord.js": "14.27.0",
+    "prism-media": "1.3.5",
+    "opusscript": "0.0.8"
+  },
+  "dave": {
+    "moduleLoaded": true,
+    "sessionApiAvailable": true,
+    "implementation": "unknown",
+    "version": "0.1.12",
+    "receiveDecryptVerified": false
+  },
+  "opus": {
+    "choice": "opusscript WASM",
+    "decoderConstructed": true,
+    "nativeAddonUsed": false
+  },
+  "transport": {
+    "aes256gcmAvailable": true,
+    "xchachaFallbackInstalled": false,
+    "negotiatedModeVerified": false
+  },
+  "caveat": "No Discord login, receive, decryption, hardware performance, or STT verification."
+}
+
+> rk3588-receive-feasibility@0.0.0 test
+> node --test test/*.test.js
+
+TAP version 13
+# Subtest: isolates interleaved speakers, variable PCM sizes, immediate writes, private outputs and final counters
+ok 1 - isolates interleaved speakers, variable PCM sizes, immediate writes, private outputs and final counters
+  ---
+  duration_ms: 9.698443
+  type: 'test'
+  ...
+# Subtest: stop flushes last buffered packet before EOF, repeated speaking events do not replace manual stream
+ok 2 - stop flushes last buffered packet before EOF, repeated speaking events do not replace manual stream
+  ---
+  duration_ms: 1.29992
+  type: 'test'
+  ...
+# Subtest: unexpected EOF is explicit, resubscription preserves the same per-speaker codec/output
+ok 3 - unexpected EOF is explicit, resubscription preserves the same per-speaker codec/output
+  ---
+  duration_ms: 3.996095
+  type: 'test'
+  ...
+# Subtest: speaker, byte, packet and PCM limits fail incomplete without extra output
+ok 4 - speaker, byte, packet and PCM limits fail incomplete without extra output
+  ---
+  duration_ms: 8.101063
+  type: 'test'
+  ...
+# Subtest: disk budget, write failures, short writes, decoder errors and receive errors are explicit
+ok 5 - disk budget, write failures, short writes, decoder errors and receive errors are explicit
+  ---
+  duration_ms: 5.632682
+  type: 'test'
+  ...
+# Subtest: bounded drain timeout, no-audio outcome, no overwrite
+ok 6 - bounded drain timeout, no-audio outcome, no overwrite
+  ---
+  duration_ms: 12.54545
+  type: 'test'
+  ...
+# Subtest: configuration gates cannot reach a login boundary without explicit consent; production IDs forbidden
+ok 7 - configuration gates cannot reach a login boundary without explicit consent; production IDs forbidden
+  ---
+  duration_ms: 1.877421
+  type: 'test'
+  ...
+# Subtest: offline DAVE API load is not native/receive proof; real WASM variable-size synthetic Opus roundtrip
+ok 8 - offline DAVE API load is not native/receive proof; real WASM variable-size synthetic Opus roundtrip
+  ---
+  duration_ms: 51.728474
+  type: 'test'
+  ...
+# Subtest: voice 0.19.2 real paused AudioReceiveStream drains buffered tail without destructive push override
+ok 9 - voice 0.19.2 real paused AudioReceiveStream drains buffered tail without destructive push override
+  ---
+  duration_ms: 5.842682
+  type: 'test'
+  ...
+# Subtest: monotonic duration guard and manifest IO failure cannot report drained success
+ok 10 - monotonic duration guard and manifest IO failure cannot report drained success
+  ---
+  duration_ms: 3.654885
+  type: 'test'
+  ...
+# Subtest: shutdown cancels actual REST HTTP boundary during guild fetch and never fetches channel
+ok 11 - shutdown cancels actual REST HTTP boundary during guild fetch and never fetches channel
+  ---
+  duration_ms: 3.021258
+  type: 'test'
+  ...
+# Subtest: late guild resolution after shutdown cannot initiate channel fetch (including cache path)
+ok 12 - late guild resolution after shutdown cannot initiate channel fetch (including cache path)
+  ---
+  duration_ms: 0.164084
+  type: 'test'
+  ...
+# Subtest: REST transport deadline aborts a stalled request rather than merely racing its await
+ok 13 - REST transport deadline aborts a stalled request rather than merely racing its await
+  ---
+  duration_ms: 3007.015878
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3231.288321
+
+== Offline Oracle boot/storage/STT unit tests (mocked adapters, no login) ==
+TAP version 13
+# Subtest: adapter guards decoded identity BEFORE constructing a client or login; actual authenticated mismatch blocks target/voice
+ok 1 - adapter guards decoded identity BEFORE constructing a client or login; actual authenticated mismatch blocks target/voice
+  ---
+  duration_ms: 2.197464
+  type: 'test'
+  ...
+# Subtest: adapter uses only configured channels, ready voice selfDeaf:false/selfMute:true, cache voice consent and discontinuity faults
+ok 2 - adapter uses only configured channels, ready voice selfDeaf:false/selfMute:true, cache voice consent and discontinuity faults
+  ---
+  duration_ms: 0.735335
+  type: 'test'
+  ...
+# Subtest: boot integration consumes durable attempted marker BEFORE test spawn and restart marker skips test
+ok 3 - boot integration consumes durable attempted marker BEFORE test spawn and restart marker skips test
+  ---
+  duration_ms: 0.310459
+  type: 'test'
+  ...
+# Subtest: exact production opt-in/allowlist/token identity gates precede adapter/login boundary
+ok 4 - exact production opt-in/allowlist/token identity gates precede adapter/login boundary
+  ---
+  duration_ms: 2.428964
+  type: 'test'
+  ...
+# Subtest: boot default is legacy only; malformed opt-in never calls supervisor/login
+ok 5 - boot default is legacy only; malformed opt-in never calls supervisor/login
+  ---
+  duration_ms: 0.91271
+  type: 'test'
+  ...
+# Subtest: durable attempted marker is private, exclusive, one shot, and crash leftovers are removed
+ok 6 - durable attempted marker is private, exclusive, one shot, and crash leftovers are removed
+  ---
+  duration_ms: 1.908214
+  type: 'test'
+  ...
+# Subtest: private storage rejects symlink, permissive directories/markers
+ok 7 - private storage rejects symlink, permissive directories/markers
+  ---
+  duration_ms: 0.488501
+  type: 'test'
+  ...
+# Subtest: normal and error test close precede orphan kill/cleanup/legacy spawn; unchanged environment
+ok 8 - normal and error test close precede orphan kill/cleanup/legacy spawn; unchanged environment
+  ---
+  duration_ms: 4.714805
+  type: 'test'
+  ...
+# Subtest: watchdog TERM then KILL does not launch legacy until test actually closes
+ok 9 - watchdog TERM then KILL does not launch legacy until test actually closes
+  ---
+  duration_ms: 37.412685
+  type: 'test'
+  ...
+# Subtest: shutdown propagates/waits boundedly; never starts legacy during shutdown
+ok 10 - shutdown propagates/waits boundedly; never starts legacy during shutdown
+  ---
+  duration_ms: 54.135564
+  type: 'test'
+  ...
+# Subtest: marker-skip supervisor path starts legacy directly and forwards termination
+ok 11 - marker-skip supervisor path starts legacy directly and forwards termination
+  ---
+  duration_ms: 0.542584
+  type: 'test'
+  ...
+# Subtest: test spawn failure resumes legacy, privacy cleanup failure fails closed
+ok 12 - test spawn failure resumes legacy, privacy cleanup failure fails closed
+  ---
+  duration_ms: 0.439376
+  type: 'test'
+  ...
+# Subtest: bounded hard chunks launch recognition DURING capture, one active, ordered stable job IDs plus final EOF tail
+ok 13 - bounded hard chunks launch recognition DURING capture, one active, ordered stable job IDs plus final EOF tail
+  ---
+  duration_ms: 18.682384
+  type: 'test'
+  ...
+# Subtest: packet absence flushes short utterance without fabricating silence; later PCM and EOF preserve order
+ok 14 - packet absence flushes short utterance without fabricating silence; later PCM and EOF preserve order
+  ---
+  duration_ms: 39.432024
+  type: 'test'
+  ...
+# Subtest: queue overload accounts explicitly for all accepted/rejected bytes, never silent drops
+ok 15 - queue overload accounts explicitly for all accepted/rejected bytes, never silent drops
+  ---
+  duration_ms: 14.085371
+  type: 'test'
+  ...
+# Subtest: job errors/deadlines cancel queued jobs and forbid overlapping recognizers, including cancellation-ignoring fake
+ok 16 - job errors/deadlines cancel queued jobs and forbid overlapping recognizers, including cancellation-ignoring fake
+  ---
+  duration_ms: 25.686111
+  type: 'test'
+  ...
+# Subtest: total drain deadline cancels active and queued work, accounts all bytes, ignores late recognition
+ok 17 - total drain deadline cancels active and queued work, accounts all bytes, ignores late recognition
+  ---
+  duration_ms: 18.498216
+  type: 'test'
+  ...
+# Subtest: blank recognition and oversized recognition never masquerade as successful transcript
+ok 18 - blank recognition and oversized recognition never masquerade as successful transcript
+  ---
+  duration_ms: 25.257818
+  type: 'test'
+  ...
+# Subtest: local pipeline writes private stereo WAV, resamples then bounds local English stdout, deletes all temporary files
+ok 19 - local pipeline writes private stereo WAV, resamples then bounds local English stdout, deletes all temporary files
+  ---
+  duration_ms: 1.608087
+  type: 'test'
+  ...
+# Subtest: local pipeline failures remove raw/converted/text artifacts without exposing errors
+ok 20 - local pipeline failures remove raw/converted/text artifacts without exposing errors
+  ---
+  duration_ms: 0.655835
+  type: 'test'
+  ...
+# Subtest: subprocess wrapper has no shell/credentials/output; abort sends TERM then KILL and waits close
+ok 21 - subprocess wrapper has no shell/credentials/output; abort sends TERM then KILL and waits close
+  ---
+  duration_ms: 556.001219
+  type: 'test'
+  ...
+# Subtest: subprocess transcript stdout is bounded, never logged/written, overflow terminates and fails
+ok 22 - subprocess transcript stdout is bounded, never logged/written, overflow terminates and fails
+  ---
+  duration_ms: 0.510543
+  type: 'test'
+  ...
+# Subtest: optional real synthetic ffmpeg conversion produces 16k mono PCM WAV, not dropped samples
+ok 23 - optional real synthetic ffmpeg conversion produces 16k mono PCM WAV, not dropped samples
+  ---
+  duration_ms: 45.721624
+  type: 'test'
+  ...
+# Subtest: notice discloses scope/local STT/Discord publication; no voice join/subscriptions before explicit consent
+ok 24 - notice discloses scope/local STT/Discord publication; no voice join/subscriptions before explicit consent
+  ---
+  duration_ms: 7.168812
+  type: 'test'
+  ...
+# Subtest: interaction guild/channel/message/author/custom ID/user must match; non-target member denied
+ok 25 - interaction guild/channel/message/author/custom ID/user must match; non-target member denied
+  ---
+  duration_ms: 1.888213
+  type: 'test'
+  ...
+# Subtest: consent restricts interleaved speakers at facade; only owner can stop; final buffered EOF accepted and published after drain
+ok 26 - consent restricts interleaved speakers at facade; only owner can stop; final buffered EOF accepted and published after drain
+  ---
+  duration_ms: 17.546839
+  type: 'test'
+  ...
+# Subtest: simultaneous start contenders cannot consent another speaker; cancel while recording cannot stop owner
+ok 27 - simultaneous start contenders cannot consent another speaker; cancel while recording cannot stop owner
+  ---
+  duration_ms: 3.031633
+  type: 'test'
+  ...
+# Subtest: any matching user may cancel waiting; cancel takes effect before acknowledgement await and cannot race Start
+ok 28 - any matching user may cancel waiting; cancel takes effect before acknowledgement await and cannot race Start
+  ---
+  duration_ms: 2.664841
+  type: 'test'
+  ...
+# Subtest: arming expiry never joins or records; record timer starts only after voice readiness
+ok 29 - arming expiry never joins or records; record timer starts only after voice readiness
+  ---
+  duration_ms: 80.589428
+  type: 'test'
+  ...
+# Subtest: startup timeout and late voice readiness cannot create capture/subscriptions after closure
+ok 30 - startup timeout and late voice readiness cannot create capture/subscriptions after closure
+  ---
+  duration_ms: 20.114763
+  type: 'test'
+  ...
+# Subtest: transport reconnect/owner departure ends test as explicit incomplete and no further capture
+ok 31 - transport reconnect/owner departure ends test as explicit incomplete and no further capture
+  ---
+  duration_ms: 57.57174
+  type: 'test'
+  ...
+# Subtest: recognizer failure and total drain timeout post explicit accounted incomplete results only after terminal work
+ok 32 - recognizer failure and total drain timeout post explicit accounted incomplete results only after terminal work
+  ---
+  duration_ms: 117.635445
+  type: 'test'
+  ...
+# Subtest: long transcript uses exactly one escaped txt attachment and a single final notice
+ok 33 - long transcript uses exactly one escaped txt attachment and a single final notice
+  ---
+  duration_ms: 13.595496
+  type: 'test'
+  ...
+# Subtest: signal during recognition cancels/drains boundedly, deletes audio, destroys client and never publishes transcript
+ok 34 - signal during recognition cancels/drains boundedly, deletes audio, destroys client and never publishes transcript
+  ---
+  duration_ms: 22.099768
+  type: 'test'
+  ...
+# Subtest: publication failure is minimal incomplete outcome; no retained raw audio/transcript and no retry/duplicate
+ok 35 - publication failure is minimal incomplete outcome; no retained raw audio/transcript and no retry/duplicate
+  ---
+  duration_ms: 14.68654
+  type: 'test'
+  ...
+# Subtest: Capture optional PCM hook observes only accepted bytes with speaker/timing and last EOF; callback failure fails incomplete
+ok 36 - Capture optional PCM hook observes only accepted bytes with speaker/timing and last EOF; callback failure fails incomplete
+  ---
+  duration_ms: 1.384296
+  type: 'test'
+  ...
+1..36
+# tests 36
+# suites 0
+# pass 36
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 789.989605
+
+== UID1001 private data directory contract ==
+
+== UID1001 data write and real ffmpeg resampling ==
+codec_name=pcm_s16le
+sample_rate=16000
+channels=1
+
+PASS: offline image preflight; no Discord login, live audio, NPU, or RK3588 benchmark.
+whisper_init_from_file_with_params_no_state: loading model from '/opt/models/ggml-base.en.bin'
+whisper_init_with_params_no_state: use gpu    = 0
+whisper_init_with_params_no_state: flash attn = 1
+whisper_init_with_params_no_state: gpu_device = 0
+whisper_init_with_params_no_state: dtw        = 0
+whisper_init_with_params_no_state: devices    = 1
+whisper_init_with_params_no_state: backends   = 1
+whisper_model_load: loading model
+whisper_model_load: n_vocab       = 51864
+whisper_model_load: n_audio_ctx   = 1500
+whisper_model_load: n_audio_state = 512
+whisper_model_load: n_audio_head  = 8
+whisper_model_load: n_audio_layer = 6
+whisper_model_load: n_text_ctx    = 448
+whisper_model_load: n_text_state  = 512
+whisper_model_load: n_text_head   = 8
+whisper_model_load: n_text_layer  = 6
+whisper_model_load: n_mels        = 80
+whisper_model_load: ftype         = 1
+whisper_model_load: qntvr         = 0
+whisper_model_load: type          = 2 (base)
+whisper_model_load: adding 1607 extra tokens
+whisper_model_load: n_langs       = 99
+whisper_model_load:          CPU total size =   147.37 MB
+whisper_model_load: model size    =  147.37 MB
+whisper_backend_init_gpu: no GPU found
+whisper_init_state: kv self size  =    6.29 MB
+whisper_init_state: kv cross size =   18.87 MB
+whisper_init_state: kv pad  size  =    3.15 MB
+whisper_init_state: compute buffer (conv)   =   16.28 MB
+whisper_init_state: compute buffer (encode) =   23.09 MB
+whisper_init_state: compute buffer (cross)  =    4.66 MB
+whisper_init_state: compute buffer (decode) =   96.37 MB
+read_audio_data: reading audio data from '/fixtures/jfk.wav' ...
+read_audio_data: trying to decode with miniaudio
+
+system_info: n_threads = 4 / 18 | WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : NEON = 1 | ARM_FMA = 1 | REPACK = 1 | 
+
+main: processing '/fixtures/jfk.wav' (176000 samples, 11.0 sec), 4 threads, 1 processors, 5 beams + best of 5, lang = en, task = transcribe, timestamps = 1 ...
+
+
+[00:00:00.000 --> 00:00:11.000]   And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.
+output_txt: saving output to '/data/oracle-test/public-smoke-XXnfDNBM/transcript.txt'
+
+whisper_print_timings:     load time =    72.49 ms
+whisper_print_timings:     fallbacks =   0 p /   0 h
+whisper_print_timings:      mel time =     4.89 ms
+whisper_print_timings:   sample time =    89.40 ms /   133 runs (     0.67 ms per run)
+whisper_print_timings:   encode time =  1143.08 ms /     1 runs (  1143.08 ms per run)
+whisper_print_timings:   decode time =    11.90 ms /     3 runs (     3.97 ms per run)
+whisper_print_timings:   batchd time =   398.62 ms /   126 runs (     3.16 ms per run)
+whisper_print_timings:   prompt time =     0.00 ms /     1 runs (     0.00 ms per run)
+whisper_print_timings:    total time =  1735.24 ms
+And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.
+PASS: actual local helper public-fixture conversion/recognition/cleanup
+
+PASS: fresh English public-fixture output sanity only; NOT accuracy, latency, or RK3588 RTF proof.

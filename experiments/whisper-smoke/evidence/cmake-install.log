@@ -1,0 +1,6 @@
+Collecting cmake==3.31.6
+  Downloading cmake-3.31.6-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl.metadata (6.3 kB)
+Downloading cmake-3.31.6-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (27.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 27.2/27.2 MB 37.1 MB/s eta 0:00:00
+Installing collected packages: cmake
+Successfully installed cmake-3.31.6

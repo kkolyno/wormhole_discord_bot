@@ -1,0 +1,6 @@
+# Disposable source/model/toolchain/build artifacts: never copy into the real repo.
+/artifacts/
+# Public-fixture build/inference evidence only; override the root *.log exclusion.
+!/evidence/*.log
+!/reproduction-evidence/*.log
+!/reproduction-evidence/**/*.log

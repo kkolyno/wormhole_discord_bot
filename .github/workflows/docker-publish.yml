@@ -5,6 +5,16 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      oracle_test:
+        description: Build the opt-in microphone-test image (feature branches only)
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: ${{ inputs.oracle_test && format('oracle-test-image-{0}', github.sha) || format('normal-image-{0}', github.run_id) }}
+  cancel-in-progress: false
 
 env:
   REGISTRY: ghcr.io
@@ -12,7 +22,8 @@ env:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    if: ${{ !inputs.oracle_test || github.ref != 'refs/heads/main' }}
+    runs-on: ${{ inputs.oracle_test && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     permissions:
       contents: read
       packages: write
@@ -34,8 +45,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,prefix=
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && !inputs.oracle_test }}
+            type=sha,prefix=,enable=${{ !inputs.oracle_test }}
+            type=raw,value=oracle-test-${{ github.sha }},enable=${{ inputs.oracle_test }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -43,10 +55,26 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Refuse replacement of an existing test commit tag
+        if: ${{ inputs.oracle_test }}
+        shell: bash
+        env:
+          IMAGE: ghcr.io/kkolyno/wormhole_discord_bot:oracle-test-${{ github.sha }}
+        run: |
+          if docker buildx imagetools inspect "$IMAGE" > /tmp/oracle-image-inspect.txt 2>&1; then
+            echo "::error::Test commit tag already exists; use a new commit."
+            exit 1
+          fi
+          if ! grep -Eqi 'manifest unknown|not found|no such manifest' /tmp/oracle-image-inspect.txt; then
+            echo "::error::Cannot establish that the test commit tag is absent."
+            exit 1
+          fi
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: ${{ inputs.oracle_test && 'Dockerfile.oracle-test' || 'Dockerfile' }}
           push: true
           platforms: linux/arm64
           tags: ${{ steps.meta.outputs.tags }}

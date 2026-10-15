@@ -1,0 +1,9 @@
+{
+  "R": "/ws/experiments/whisper-smoke/artifacts/run-20261015T192903Z-b6hYGwet",
+  "S": "/ws/experiments/whisper-smoke/artifacts/run-20261015T192903Z-b6hYGwet/whisper.cpp-d1be6fde11ac6e0407606b4e42fe72d34add8037",
+  "B": "/ws/experiments/whisper-smoke/artifacts/run-20261015T192903Z-b6hYGwet/build",
+  "E": "/ws/experiments/whisper-smoke/reproduction-evidence/run-20261015T192903Z-b6hYGwet",
+  "source_absent_before_extraction": true,
+  "build_absent_before_configure": true,
+  "transcript_absent_at_run_start": true
+}

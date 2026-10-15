@@ -11,6 +11,7 @@ node_modules
 # Environment files
 .env
 .env.*
+.private
 
 # Documentation
 README.md

@@ -1,0 +1,9 @@
+test_manual_only_unique_tag_no_deploy (__main__.ImageContract.test_manual_only_unique_tag_no_deploy) ... ok
+test_pinned_cpu_build_and_safe_default (__main__.ImageContract.test_pinned_cpu_build_and_safe_default) ... ok
+test_verify_before_model_or_source_use (__main__.ImageContract.test_verify_before_model_or_source_use) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.001s
+
+OK
+PASS: actionlint 1.7.7

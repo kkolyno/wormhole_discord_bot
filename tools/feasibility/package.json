@@ -1,0 +1,21 @@
+{
+  "name": "rk3588-receive-feasibility",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "preflight": "node probe.js",
+    "test": "node --test test/*.test.js",
+    "test:hardware": "python3 -m unittest discover -s test -p 'test_*.py' -v"
+  },
+  "dependencies": {
+    "@discordjs/voice": "0.19.2",
+    "@snazzah/davey": "0.1.12",
+    "discord.js": "14.27.0",
+    "opusscript": "0.0.8",
+    "prism-media": "1.3.5"
+  }
+}

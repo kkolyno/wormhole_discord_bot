@@ -1,0 +1,72 @@
+# Isolated Oracle feature image. Original Dockerfile and application are unchanged.
+# Both stages deliberately use the same pinned musl/ARM64 runtime ABI.
+FROM node:22.22.0-alpine3.23@sha256:e4bf2a82ad0a4037d28035ae71529873c069b13eb0455466ae0bc13363826e34 AS whisper-build
+WORKDIR /build
+RUN test "$(uname -m)" = aarch64 && apk add --no-cache build-base cmake curl
+# whisper.cpp v1.9.5. Verify size AND SHA-256 before extraction/build.
+RUN curl --fail --location --retry 3 -o source.tar.gz https://codeload.github.com/ggml-org/whisper.cpp/tar.gz/d1be6fde11ac6e0407606b4e42fe72d34add8037 \
+ && test "$(wc -c < source.tar.gz)" -eq 9631456 \
+ && echo '645445da884df6dbd52b30f82d7be7c01d1767c938714e477e786b88d529e9f4  source.tar.gz' | sha256sum -c - \
+ && mkdir source && tar -xzf source.tar.gz -C source --strip-components=1
+RUN cmake -S source -B out -DCMAKE_BUILD_TYPE=Release \
+      -DWHISPER_BUILD_IS_DEV=OFF -DWHISPER_BUILD_TESTS=OFF \
+      -DWHISPER_BUILD_SERVER=OFF -DWHISPER_CURL=OFF \
+      -DWHISPER_COREML=OFF -DWHISPER_OPENVINO=OFF \
+      -DGGML_NATIVE=OFF -DGGML_CPU_ARM_ARCH=armv8-a -DGGML_CPU=ON \
+      -DGGML_CUDA=OFF -DGGML_VULKAN=OFF -DGGML_METAL=OFF \
+      -DGGML_BLAS=OFF -DGGML_OPENMP=OFF -DGGML_CCACHE=OFF \
+ && cmake --build out --target whisper-cli --parallel 4 \
+ && mkdir -p /artifact/bin /artifact/lib /artifact/licenses/whisper.cpp /artifact/evidence \
+ && cp out/bin/whisper-cli /artifact/bin/ \
+ && find out -name '*.so*' -exec cp -L '{}' /artifact/lib/ ';' \
+ && cp source/LICENSE /artifact/licenses/whisper.cpp/LICENSE \
+ && cp out/CMakeCache.txt /artifact/evidence/CMakeCache.txt \
+ && { gcc --version; g++ --version; cmake --version; cat /etc/alpine-release; } > /artifact/evidence/build-versions.txt
+# English-only base model, pinned Hugging Face repository revision; no runtime download.
+RUN mkdir -p /artifact/models /artifact/licenses/whisper-model \
+ && curl --fail --location --retry 3 -o /artifact/models/ggml-base.en.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.en.bin \
+ && test "$(wc -c < /artifact/models/ggml-base.en.bin)" -eq 147964211 \
+ && echo 'a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002  /artifact/models/ggml-base.en.bin' | sha256sum -c - \
+ && curl --fail --location --retry 3 -o /artifact/licenses/whisper-model/LICENSE https://raw.githubusercontent.com/openai/whisper/86098128c0b4f24f0e2aa2994de830614b474227/LICENSE \
+ && echo 'b5d65a59060e68c4ff940e1eddfa6f94b2d68fdf58ed7f4dd57721c997e35e9d  /artifact/licenses/whisper-model/LICENSE' | sha256sum -c - \
+ && curl --fail --location --retry 3 -o /artifact/licenses/whisper-model/README.md https://raw.githubusercontent.com/openai/whisper/86098128c0b4f24f0e2aa2994de830614b474227/README.md \
+ && echo '38c180c2a8d8ba628a3e131ad42bf06c8a51bb681efb30fbe28d5a0f4b65f288  /artifact/licenses/whisper-model/README.md' | sha256sum -c -
+
+FROM node:22.22.0-alpine3.23@sha256:e4bf2a82ad0a4037d28035ae71529873c069b13eb0455466ae0bc13363826e34 AS runtime
+WORKDIR /app
+RUN apk add --no-cache ffmpeg libstdc++ libgcc tini \
+ && addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001 -G nodejs \
+ && mkdir -p /data/oracle-test && chmod 700 /data/oracle-test && chown -R 1001:1001 /data
+COPY --from=whisper-build /artifact/bin/ /usr/local/bin/
+COPY --from=whisper-build /artifact/lib/ /usr/local/lib/
+COPY --from=whisper-build /artifact/models/ /opt/models/
+COPY --from=whisper-build /artifact/licenses/ /usr/share/licenses/
+COPY --from=whisper-build /artifact/evidence/ /usr/share/oracle-test-image/
+ENV LD_LIBRARY_PATH=/usr/local/lib \
+    DATA_DIR=/data/oracle-test \
+    WHISPER_CLI=/usr/local/bin/whisper-cli \
+    WHISPER_MODEL=/opt/models/ggml-base.en.bin \
+    FFMPEG_PATH=/usr/bin/ffmpeg
+COPY package*.json ./
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+COPY index.js ./
+COPY src/ ./src/
+# Only allowlisted code/manifests enter the final image: never tools audio/data.
+COPY tools/feasibility/package*.json ./tools/feasibility/
+RUN npm ci --prefix tools/feasibility --omit=dev --ignore-scripts && npm cache clean --force
+COPY tools/feasibility/*.js ./tools/feasibility/
+COPY tools/feasibility/test/*.js ./tools/feasibility/test/
+COPY tools/oracle-test/*.js ./tools/oracle-test/
+COPY tools/oracle-test/test/*.js ./tools/oracle-test/test/
+COPY tools/oracle-test-image/preflight.sh tools/oracle-test-image/boot-group-smoke.js ./tools/oracle-test-image/
+RUN ldd /usr/local/bin/whisper-cli \
+ && ! ldd /usr/local/bin/whisper-cli 2>&1 | grep -E 'not found|Error loading|Error relocating' \
+ && /usr/local/bin/whisper-cli --help >/dev/null 2>&1 \
+ && /usr/bin/ffmpeg -version \
+ && node --version && npm --version \
+ && test "$(node -p 'process.versions.node')" = 22.22.0
+USER nodejs
+# Reap orphaned test recognizers before boot can confirm its process group is gone.
+ENTRYPOINT ["/sbin/tini", "--", "docker-entrypoint.sh"]
+# Safe old behavior: this image never opts itself into capture.
+CMD ["node", "index.js"]

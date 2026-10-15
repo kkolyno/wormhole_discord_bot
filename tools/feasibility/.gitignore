@@ -1,0 +1,4 @@
+node_modules/
+__pycache__/
+test/__pycache__/
+recordings/

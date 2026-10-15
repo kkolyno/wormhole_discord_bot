@@ -6,6 +6,9 @@ node_modules/
 .env.local
 .env.*.local
 
+# Local deployment credentials and private snapshots
+.private/
+
 # Logs
 logs/
 *.log

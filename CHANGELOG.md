@@ -2,6 +2,20 @@
 
 All notable changes to Oracle will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Clean handoff for robust local RK3588 call transcription: process during calls,
+  publish the final meeting summary only after transcription completes.
+
+### Changed
+- Clarified current helper behavior, required client ID, and deployment-document
+  provenance; no runtime behavior or production deployment changed.
+
+### Removed
+- Rejected transcription plan and stale coding guidance that prescribed incorrect
+  credential storage.
+
 ## [0.0.3] - 2026-01-26
 
 ### Fixed
