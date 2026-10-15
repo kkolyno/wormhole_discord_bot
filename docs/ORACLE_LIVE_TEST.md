@@ -104,6 +104,21 @@ or after its ten-minute waiting expiry. The test does **not** add automatic
 transcripts to ordinary meeting summaries. That requires the later durable
 capture/work/publication coordinator and representative workload validation.
 
+## Activation and readiness observed
+
+Oracle was recreated with the test image after both target checks passed. Its
+running image ID was verified against the pulled ID above. A newly posted notice
+with an enabled consent button was independently read through Discord:
+
+- Posted at **2026-10-15 20:33:15 UTC**, with a ten-minute waiting window.
+- <https://discord.com/channels/1465125548379607094/1465216403241041981/1560390120241242215>
+
+The user was notified that it is ready. This proves test startup/login/notice
+publication, **not** consent, successful voice receive/decryption, or microphone
+recognition. Do not infer any of those without an actual test outcome. The
+original image remains pinned; ordinary legacy handling automatically resumes
+after the one-shot child terminates. Restart will not silently rearm recording.
+
 ## Operator recovery
 
 Read `scripts/ORACLE-TEST-OPERATIONS.md` first. Exact helper rollback command:
@@ -125,3 +140,13 @@ snapshot checks, empty normalized default IPAM, and OMV's JSON-string coercion.
 A YAML comment before each JSON override keeps it text for OMV's schema validator
 while remaining valid Compose YAML. Image runtime verification is recorded in
 `tools/oracle-test-image/RESULTS.md` (57 native offline tests and real local smokes).
+
+## Development cleanup
+
+The isolated worker `sb_cac01407` was stopped and deleted; absence from the API
+and absence of its Docker container were verified. Its final local test-image tag
+and scratch npm dependencies were removed without pruning shared Docker caches.
+The disposable source/docs/evidence workspace remains at
+`/Users/kasey/Documents/GitHub/_agent-sandbox/wormhole-rk3588-live` (~1.2 MiB).
+It has no production credentials or captured private call audio. Deleting this
+worker does not affect Oracle on the separately managed RK3588 host.

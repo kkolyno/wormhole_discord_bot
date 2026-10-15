@@ -8,12 +8,14 @@ design or treat its model choices, performance estimates, snippets, or guarantee
 as evidence. This file is the requirements/context handoff, not a validated
 implementation design.
 
-**Next task:** establish the real hardware/runtime constraints and prove a working
-audio-capture and local-recognition path, then design and implement the smallest
-robust solution. Do not spend another session merely restating the old plan.
-Production changes still require explicit authorization.
+**Current task:** complete the explicitly consented Oracle microphone test, then
+use its evidence plus representative workload requirements to design the smallest
+robust meeting-transcription integration. Target hardware and local public-sample
+recognition are now verified; live microphone receive/decryption is not yet proven.
+The user has authorized the bounded Oracle work described below; unrelated changes
+and broader deployment still require their appropriate authorization.
 
-**2026-10-15 feasibility follow-up:** see
+**Earlier read-only 2026-10-15 feasibility phase:** see
 [`docs/TRANSCRIPTION_FEASIBILITY.md`](docs/TRANSCRIPTION_FEASIBILITY.md). Read-only
 OMV queries rechecked deployment status and a limited OS/RAM/load snapshot. The
 isolated kit in `tools/feasibility/` passed 13 Node and 5 Python offline tests;
@@ -42,6 +44,30 @@ hardware fields, not the need for live capture and representative benchmarks.
 Earlier production-access restrictions in this handoff describe the previous
 authorization boundary; preserve operational safeguards and rollback for the now
 authorized Oracle work. Do not touch unrelated services or expose credentials.
+
+### Live one-shot test now deployed
+
+See [`docs/ORACLE_LIVE_TEST.md`](docs/ORACLE_LIVE_TEST.md) for exact artifact IDs,
+rollback command, private journal location, consent/retention, and measurements.
+Both feature and rollback branches have been pushed; `main` is unchanged.
+Native ARM64 image checks passed 57 audio/probe tests, real orphan-group handoff,
+real ffmpeg/local recognition, and 38 separate administration fake tests.
+
+The actual RK3588 recognized the fixed public English fixture. The real helper
+processed 8 seconds of stereo/48 kHz input in 6.460 seconds (warm-cache RTF 0.808),
+with reported one-off peak memory ~310 MiB and temperatures ~47→52°C. These are
+short public-sample measurements, not sustained/multi-speaker capacity or private
+call accuracy. CPU `base.en` is still a test baseline; no production model selected.
+
+The feature image has replaced Oracle for its explicitly consented one-shot test.
+The new consent notice was verified through Discord at **2026-10-15 20:33:15 UTC**:
+https://discord.com/channels/1465125548379607094/1465216403241041981/1560390120241242215
+The user was told it is ready. Waiting expires ten minutes after that notice.
+Do not claim the user has clicked Start, audio was captured/decrypted, or private
+speech was recognized until observing an actual test outcome. Raw private speech
+must not be copied to agent workspaces. The test resumes unchanged legacy
+`index.js` after bounded cleanup or idle expiry; it does not enable automatic
+transcripts in ordinary meeting summaries. Restart does not rearm the one-shot.
 
 ## User's clarified goal
 

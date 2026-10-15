@@ -2,6 +2,12 @@
 
 Date: 2026-10-15. This is an experiment record, **not an approved implementation or deployment plan**. Read `HANDOFF.md` and `DEPLOYMENT.md` for requirements and operational boundaries. No rejected plan was used as evidence.
 
+**Historical first, read-only/offline phase.** The safety statements and unknowns
+below describe that earlier phase, not the later authorized live Oracle work.
+For verified RK3588 hardware, actual public-sample local-recognition measurements,
+the deployed consent-based one-shot microphone test and exact rollback, see
+[`ORACLE_LIVE_TEST.md`](ORACLE_LIVE_TEST.md) and the current `HANDOFF.md`.
+
 ## Safety and scope
 
 - No production image pull, restart, stack change, driver/package installation, bot login, or recording was performed.
