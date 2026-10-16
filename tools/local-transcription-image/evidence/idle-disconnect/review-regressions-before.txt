@@ -1,0 +1,326 @@
+✔ channel policy captures a lone brain dump before notice acknowledgement; canonical waits for end and jobs (262.259668ms)
+✔ channel policy never starts for a bots-only room (7.57253ms)
+✔ manual policy still never opens audio without a current participant click (61.702339ms)
+✔ trusted gateway recovery automatically opens a new channel-policy session without a click (157.668481ms)
+✔ deliberate End survives occupied restart; known empty resets it and next lone join starts automatically (126.51214ms)
+✔ personal Stop beats stalled acknowledgement and survives polling, nonempty rejoin and restart; Resume is deliberate (168.965316ms)
+✔ manual real feature: idle closed notice Start wakes only session control, preserving pauses (125.219912ms)
+✔ channel real feature: idle closed notice Start wakes only session control, preserving pauses (149.970823ms)
+✔ real feature: idle ignores gateway recovery and restart snapshots; arrival/rejoin while others stay wakes it (144.91854ms)
+✔ real feature: unknown to known snapshot alone is not a fresh member arrival (139.373333ms)
+✔ real feature: Start authenticates guild, alerts room, bot author, latest notice and current voice presence (116.72716ms)
+✔ real feature: stop fences Start stalled at snapshot (63.079401ms)
+✔ real feature: end fences Start stalled at snapshot (70.564513ms)
+✔ real feature: unknown fences Start stalled at snapshot (52.591494ms)
+✔ real feature: stop fences Start stalled at acknowledgement (65.967194ms)
+✔ real feature: end fences Start stalled at acknowledgement (67.350506ms)
+✔ real feature: unknown fences Start stalled at acknowledgement (56.007587ms)
+✔ real feature: slow Start acknowledgement succeeds when still current; slow new notice POST does not gate channel capture (140.285429ms)
+✔ real feature: End on closed source notice beats Start during slow new voice ready (128.47417ms)
+✔ real feature: late notice acknowledgement after idle and subsequent wake never re-enables stale Start (107.425021ms)
+✖ real feature: fresh arrival survives a superseding mute snapshot and wakes exactly once (69.95917ms)
+✖ real feature: arrival observed before inactivity cannot replay after its delayed snapshot (116.425906ms)
+✔ real feature: a fast leave/rejoin wakes idle even when the older leave snapshot is still blocked (133.522828ms)
+✔ core/config defaults and strict bounded idle env are 15s and 300s (1.046474ms)
+✔ manual: known empty closes at exactly 15 seconds; unknown restarts grace and cannot complete quiet (83.59129ms)
+✔ manual: never-spoke session idles at exact 300s and occupied polling never reopens it (66.799581ms)
+✔ manual: accepted nonzero PCM resets using trusted coordinator clock; exact zero and excluded users do not (78.810177ms)
+✔ manual: Start preserves personal Stops and never grants manual consent (52.654495ms)
+✔ manual: trustworthy new arrival and leave/rejoin wake while others remain, not ordinary changed snapshots (167.183956ms)
+✔ manual: unknown recovery/initial snapshot do not count as joins; known empty resets idle (126.66235ms)
+✔ manual: no manual consent/paused/revoked callbacks cannot keep a session alive (78.947388ms)
+✔ channel: known empty closes at exactly 15 seconds; unknown restarts grace and cannot complete quiet (149.178937ms)
+✔ channel: never-spoke session idles at exact 300s and occupied polling never reopens it (142.642881ms)
+✔ channel: accepted nonzero PCM resets using trusted coordinator clock; exact zero and excluded users do not (177.792947ms)
+✔ channel: Start preserves personal Stops and never grants manual consent (123.944019ms)
+✔ channel: trustworthy new arrival and leave/rejoin wake while others remain, not ordinary changed snapshots (182.122304ms)
+✔ channel: unknown recovery/initial snapshot do not count as joins; known empty resets idle (82.100226ms)
+✔ channel: no manual consent/paused/revoked callbacks cannot keep a session alive (48.93994ms)
+✔ idle drains accepted EOF and waits for sealed/accounted terminal results; new open waits physical close (105.542744ms)
+✔ idle clock starts at actual capture authorization after slow ready (47.600002ms)
+✔ invalid/rejected packets never reset idle and faults remain explicit incomplete safety stops (169.133819ms)
+✔ restart, retention and gateway recovery preserve bounded idle-wait and personal optouts (96.430232ms)
+✔ pending Start is fenced synchronously by later stop behind a queue barrier (46.525278ms)
+✔ pending Start is fenced synchronously by later end behind a queue barrier (54.501773ms)
+✔ pending Start is fenced synchronously by later unknown behind a queue barrier (43.540817ms)
+✔ pending Start is fenced synchronously by later safety behind a queue barrier (45.445596ms)
+✔ Start slow voice ready cannot subscribe after stop (69.991671ms)
+✔ Start slow voice ready cannot subscribe after end (78.276836ms)
+✔ Start slow voice ready cannot subscribe after unknown (71.694905ms)
+✔ Start slow voice ready cannot subscribe after safety (70.566512ms)
+✖ older coalesced empty cannot erase newer idle end hold or capture even briefly (83.43058ms)
+✖ older coalesced empty cannot erase newer idle safety hold or capture even briefly (70.891559ms)
+✖ separate monotonic clock enforces inactivity deadline despite wall rollback and final payload stays publishable (46.468235ms)
+✖ separate monotonic clock enforces known_empty deadline despite wall rollback and final payload stays publishable (43.816071ms)
+✔ idle control commit failure closes acceptance, persists fallback hold and never auto-retries (46.859033ms)
+✔ crash inside wake control commit restores idle-wait before retention deletes session intent (26.413228ms)
+✔ durable idle control rejects malformed booleans and preserves independent hold and optouts (16.172575ms)
+✔ Start rejects outsider, stale/old notices, current capture, unknown and safety/max-duration holds (141.157734ms)
+✔ bounded coalescing retains a fresh arrival, but newer unknown cancels it without occupied retry loop (81.126879ms)
+✔ closed-notice personal Stop is durable even when current occupancy is unknown (88.761326ms)
+✔ a cancelled wake followed by known empty does not leave a permanent interrupted-wake tombstone (105.205197ms)
+✔ interrupted idle-stop intent recovers as incomplete inactivity, never an occupied startup wake (25.708134ms)
+✔ wake transaction fails closed on interrupted control commit (85.243107ms)
+✔ wake transaction fails closed on interrupted session commit (61.98826ms)
+ℹ tests 64
+ℹ suites 0
+ℹ pass 58
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3428.841181
+
+✖ failing tests:
+
+test at test/local-transcription/channel.integration.test.js:256:1
+✖ real feature: fresh arrival survives a superseding mute snapshot and wakes exactly once (69.95917ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(f.core.current)
+  
+      at TestContext.<anonymous> (/ws/test/local-transcription/channel.integration.test.js:264:25)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test/local-transcription/channel.integration.test.js:269:1
+✖ real feature: arrival observed before inactivity cannot replay after its delayed snapshot (116.425906ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + {
+  +   acceptedBytes: 0,
+  +   accepting: true,
+  +   captureAuthorized: true,
+  +   closePromise: null,
+  +   closing: false,
+  +   eof: false,
+  +   epochs: Map(0) {},
+  +   gates: Set(2) {
+  +     '111111111111111111',
+  +     '222222222222222222'
+  +   },
+  +   handle: {
+  +     allowed: Set(2) {
+  +       '111111111111111111',
+  +       '222222222222222222'
+  +     },
+  +     close: [AsyncFunction: close],
+  +     closed: false,
+  +     emit: [Function: emit],
+  +     onFault: [Function: onFault],
+  +     onPcm: [Function: onPcm],
+  +     sessionId: '23e98b84-a757-4f47-a9a3-c56869c7fbe4',
+  +     setConsented: [AsyncFunction: setConsented]
+  +   },
+  +   id: '23e98b84-a757-4f47-a9a3-c56869c7fbe4',
+  +   jobs: Map(0) {},
+  +   lastActivityAt: 301000,
+  +   opening: Promise {
+  +     Symbol(async_id_symbol): 15275,
+  +     Symbol(trigger_async_id_symbol): 15274,
+  +     {
+  +       allowed: Set(2) {
+  +         '111111111111111111',
+  +         '222222222222222222'
+  +       },
+  +       close: [AsyncFunction: close],
+  +       closed: false,
+  +       emit: [Function: emit],
+  +       onFault: [Function: onFault],
+  +       onPcm: [Function: onPcm],
+  +       sessionId: '23e98b84-a757-4f47-a9a3-c56869c7fbe4',
+  +       setConsented: [AsyncFunction: setConsented]
+  +     }
+  +   },
+  +   physicalClosed: false,
+  +   receivedBytes: 0,
+  +   rejectedBytes: 0,
+  +   subscriptionTails: Map(0) {},
+  +   wakeEpoch: Symbol(),
+  +   wakePending: false,
+  +   wakeSource: '777777777777777771'
+  + }
+  - null
+  
+      at TestContext.<anonymous> (/ws/test/local-transcription/channel.integration.test.js:275:10)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/local-transcription/idle-disconnect.test.js:213:41
+✖ older coalesced empty cannot erase newer idle end hold or capture even briefly (83.43058ms)
+  AssertionError [ERR_ASSERTION]: no interim receiver open
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/ws/test/local-transcription/idle-disconnect.test.js:220:10)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/local-transcription/idle-disconnect.test.js:213:41
+✖ older coalesced empty cannot erase newer idle safety hold or capture even briefly (70.891559ms)
+  AssertionError [ERR_ASSERTION]: no interim receiver open
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/ws/test/local-transcription/idle-disconnect.test.js:220:10)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/local-transcription/idle-disconnect.test.js:229:53
+✖ separate monotonic clock enforces inactivity deadline despite wall rollback and final payload stays publishable (46.468235ms)
+  AssertionError [ERR_ASSERTION]: elapsed deadline must not depend on wall time
+  + actual - expected
+  
+  + {
+  +   acceptedBytes: 4,
+  +   accepting: true,
+  +   captureAuthorized: true,
+  +   closePromise: null,
+  +   closing: false,
+  +   eof: false,
+  +   epochs: Map(0) {},
+  +   gates: Set(1) {
+  +     '111111111111111111'
+  +   },
+  +   handle: {
+  +     close: [AsyncFunction: close],
+  +     onFault: [Function: onFault],
+  +     onPcm: [Function: onPcm],
+  +     sessionId: '6d81029b-7fb7-4250-8828-f080c84d3fcb',
+  +     setConsented: [AsyncFunction: setConsented],
+  +     subscriptions: Set(1) {
+  +       '111111111111111111'
+  +     }
+  +   },
+  +   id: '6d81029b-7fb7-4250-8828-f080c84d3fcb',
+  +   jobs: Map(1) {
+  +     '111111111111111111' => {
+  +       id: '61071245-5aba-4ff4-8ee3-640a8faa15ae',
+  +       lastAt: 900000
+  +     }
+  +   },
+  +   lastActivityAt: 900000,
+  +   opening: Promise {
+  +     Symbol(async_id_symbol): 12595,
+  +     Symbol(trigger_async_id_symbol): 12594,
+  +     {
+  +       close: [AsyncFunction: close],
+  +       onFault: [Function: onFault],
+  +       onPcm: [Function: onPcm],
+  +       sessionId: '6d81029b-7fb7-4250-8828-f080c84d3fcb',
+  +       setConsented: [AsyncFunction: setConsented],
+  +       subscriptions: Set(1) {
+  +         '111111111111111111'
+  +       }
+  +     }
+  +   },
+  +   physicalClosed: false,
+  +   receivedBytes: 4,
+  +   rejectedBytes: 0,
+  +   subscriptionTails: Map(0) {},
+  +   wakeEpoch: undefined,
+  +   wakePending: false,
+  +   wakeSource: undefined
+  + }
+  - null
+  
+      at TestContext.<anonymous> (/ws/test/local-transcription/idle-disconnect.test.js:241:28)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/local-transcription/idle-disconnect.test.js:229:53
+✖ separate monotonic clock enforces known_empty deadline despite wall rollback and final payload stays publishable (43.816071ms)
+  AssertionError [ERR_ASSERTION]: elapsed deadline must not depend on wall time
+  + actual - expected
+  
+  + {
+  +   acceptedBytes: 0,
+  +   accepting: true,
+  +   captureAuthorized: true,
+  +   closePromise: null,
+  +   closing: false,
+  +   eof: false,
+  +   epochs: Map(1) {
+  +     '111111111111111111' => 2
+  +   },
+  +   gates: Set(0) {},
+  +   handle: {
+  +     close: [AsyncFunction: close],
+  +     onFault: [Function: onFault],
+  +     onPcm: [Function: onPcm],
+  +     sessionId: '88d9f853-2152-4198-a904-7380d48f8601',
+  +     setConsented: [AsyncFunction: setConsented],
+  +     subscriptions: Set(0) {}
+  +   },
+  +   id: '88d9f853-2152-4198-a904-7380d48f8601',
+  +   jobs: Map(0) {},
+  +   lastActivityAt: 1000000,
+  +   opening: Promise {
+  +     Symbol(async_id_symbol): 12833,
+  +     Symbol(trigger_async_id_symbol): 12832,
+  +     {
+  +       close: [AsyncFunction: close],
+  +       onFault: [Function: onFault],
+  +       onPcm: [Function: onPcm],
+  +       sessionId: '88d9f853-2152-4198-a904-7380d48f8601',
+  +       setConsented: [AsyncFunction: setConsented],
+  +       subscriptions: Set(0) {}
+  +     }
+  +   },
+  +   pendingAuthorization: Symbol(),
+  +   physicalClosed: false,
+  +   receivedBytes: 0,
+  +   rejectedBytes: 0,
+  +   subscriptionTails: Map(0) {},
+  +   wakeEpoch: undefined,
+  +   wakePending: false,
+  +   wakeSource: undefined
+  + }
+  - null
+  
+      at TestContext.<anonymous> (/ws/test/local-transcription/idle-disconnect.test.js:241:28)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

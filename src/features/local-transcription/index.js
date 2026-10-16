@@ -6,6 +6,7 @@ const BUTTONS = Object.freeze({
   local_transcription_consent: 'consent',
   local_transcription_revoke: 'revoke',
   local_transcription_end: 'end',
+  local_transcription_start: 'start',
 });
 const safeError = code => Object.assign(new Error(code), { code });
 function configureRest(client, timeoutMs = 10000) {
@@ -85,7 +86,7 @@ async function voiceSnapshot(client, config, known = true) {
 // Only these fixed codes may be displayed, never an arbitrary error/string.
 const STATUS_ISSUES = new Set([
   'CORE_FAILURE', 'CORE_STORAGE_OR_LIFECYCLE_FAILED', 'FEATURE_FAILURE', 'STARTUP_FAILURE', 'GATEWAY_INTERRUPTION',
-  'AUTOMATIC_OPTOUT_FAILED',
+  'AUTOMATIC_OPTOUT_FAILED', 'IDLE_CONTROL_FAILED',
   'CONSENT_LIMIT', 'PARTICIPANT_LIMIT', 'SESSION_LIMIT', 'QUEUE_LIMIT', 'SPOOL_LIMIT', 'JOB_RECORD_LIMIT',
   'PCM_PACKET_INVALID', 'PCM_WRITE_FAILED', 'PCM_STORAGE_FAILED', 'PCM_ACCOUNTING_MISMATCH',
   'SCHEDULER_STORE_FAILED', 'SCHEDULER_CALLBACK_FAILED', 'RECOGNITION_FAILED', 'RECOGNITION_TIMEOUT',
@@ -111,9 +112,9 @@ function statusText(status = {}, state = 'starting') {
   const issue = status.issue === null ? 'none' : STATUS_ISSUES.has(status.issue) ? status.issue : status.issue === undefined ? 'unknown' : 'unrecognized (details withheld)';
   return `Local transcription: ${lifecycle}; recording: ${bool(status.recording)}; consenting: ${count(status.consenting)}; occupancy: ${count(status.occupancy)}. ` +
     `Queue: ${count(status.pendingJobs)}; draining: ${count(status.draining)}; incomplete: ${count(status.incomplete)}; held/uncertain: ${count(status.held)}. ` +
-    `Hold until empty: ${bool(status.holdUntilEmpty)}; failed: ${bool(status.failed)}; issue: ${issue}. ` +
+    `Idle waiting: ${bool(status.idleWait)}; Hold until empty: ${bool(status.holdUntilEmpty)}; failed: ${bool(status.failed)}; issue: ${issue}. ` +
     `Fixed consent policy: ${policy}; paused microphones: ${paused}. ` +
-    (policy === 'channel' ? 'Automatic under administrator-confirmed company standing consent, including one person. Restart/reconnect can resume only with known occupancy and no safety/End hold; personal pauses persist until resume or known empty. ' :
+    (policy === 'channel' ? 'Automatic under administrator-confirmed company standing consent, including one person. Restart/reconnect can resume only with known occupancy, no idle wait and no safety/End hold; personal pauses persist until resume or known empty. ' :
       policy === 'manual' ? 'Recording requires explicit consent for each account; leave, interruption, or restart revokes it. ' : 'Consent policy unavailable; no automatic authorization is assumed. ') +
     'Held/uncertain publication requires review; transcript text is never shown in status.';
 }
@@ -128,6 +129,9 @@ function createFeature(deps = {}) {
   let config, client, coordinator, lock, capture, timer, cleanupPromise, startupPromise;
   let state = 'starting', known = false, stopped = false, generation = 0, gatewayAvailable = true;
   let observed = new Set();
+  // Bounded authenticated event-time evidence survives superseded REST fetches.
+  // Core epochs, not later snapshot timing, decide whether it may wake idle.
+  const pendingArrivals = new Map();
   // Own only currently pending grants. A later Stop cancels an earlier Resume
   // stalled on snapshot/interaction HTTP before it can call core's grant method.
   const pendingGrants = new Map();
@@ -143,7 +147,8 @@ function createFeature(deps = {}) {
     const current = new Set((members || []).map(member => member.id));
     for (const id of observed) if (!members || !current.has(id)) coordinator.invalidate(id);
     observed = current;
-    await coordinator.membership(members);
+    const arrivals = [...pendingArrivals.values()]; pendingArrivals.clear();
+    await coordinator.membership(members, { arrivals });
   }
   async function cleanup() {
     if (cleanupPromise) return cleanupPromise;
@@ -177,7 +182,7 @@ function createFeature(deps = {}) {
     try { await operation(); } catch { await failClosed('FEATURE_FAILURE'); }
   }
   async function button(interaction, action) {
-    let grantToken;
+    let grantToken, startToken;
     const userId = interaction.user?.id;
     try {
       const cfg = getConfig();
@@ -185,7 +190,13 @@ function createFeature(deps = {}) {
         interaction.user?.bot || !ACCOUNT_ID.test(interaction.user?.id || '') || interaction.message?.author?.id !== client.user.id) return await deny(interaction);
       // Exact durable current notice; IDs remain static across restarts.
       const active = store.listSessions().find(session => session.phase === 'active' && session.notice?.state === 'sent' && session.notice.id === interaction.message.id);
-      if (!active) return await deny(interaction);
+      const closed = coordinator.latestWakeNotice?.(interaction.message.id);
+      if (action === 'start' ? !closed : !active && !(closed && ['revoke', 'end'].includes(action))) return await deny(interaction);
+      if (action === 'start') {
+        if (!cachedVoiceMember(client, cfg, userId)) return await deny(interaction);
+        startToken = coordinator.prepareStart(userId, interaction.message.id);
+        if (!startToken) return await deny(interaction);
+      }
       let cutoff;
       const epoch = generation;
       if (action === 'end') {
@@ -198,7 +209,7 @@ function createFeature(deps = {}) {
       } else if (action === 'revoke') {
         // A present or already-accounted participant may conservatively pause
         // their own mic without HTTP. Strangers cannot fill durable optout slots.
-        if (!active.participants?.[userId] && !cachedVoiceMember(client, cfg, userId)) return await deny(interaction);
+        if (!(active || closed).participants?.[userId] && !cachedVoiceMember(client, cfg, userId)) return await deny(interaction);
         pendingGrants.delete(userId);
         // Core synchronously cuts gates AND persists standing-policy suppression.
         // Exact notice/account authorization above needs no later snapshot HTTP.
@@ -216,13 +227,15 @@ function createFeature(deps = {}) {
         await interaction.editReply({ content: 'Voice membership changed; no new consent was assumed. Try the current notice again.' });
         return;
       }
-      const accepted = cutoff ? await cutoff : await coordinator.consent(userId, interaction.message.id);
+      const accepted = cutoff ? await cutoff : action === 'start'
+        ? await coordinator.startAgain(userId, interaction.message.id, startToken)
+        : await coordinator.consent(userId, interaction.message.id);
       if (accepted === false) {
         await interaction.editReply({ content: 'Local transcription action was not accepted. No new consent was assumed; recording may be unavailable or at its safety limit.' });
         return;
       }
-      const channelPolicy = active.consentMode === 'channel';
-      await interaction.editReply({ content: action === 'consent' ? (channelPolicy ? 'Your microphone resumed under company standing consent. Shared microphone: ensure everyone audible has consented; otherwise stop your microphone.' : 'Consent recorded for your account only. Shared microphone: obtain permission from everyone audible; otherwise stop your microphone.') : action === 'revoke' ? (channelPolicy ? 'Your microphone is paused until you explicitly resume on the current notice or the channel is known empty.' : 'Your microphone consent has been revoked.') : 'Session capture ended. A known empty channel is required before a new session.' });
+      const channelPolicy = (active || closed).consentMode === 'channel';
+      await interaction.editReply({ content: action === 'start' ? 'A new session started under the fixed channel policy. Personal pauses remain paused; manual policy still needs fresh microphone consent on the new notice.' : action === 'consent' ? (channelPolicy ? 'Your microphone resumed under company standing consent. Shared microphone: ensure everyone audible has consented; otherwise stop your microphone.' : 'Consent recorded for your account only. Shared microphone: obtain permission from everyone audible; otherwise stop your microphone.') : action === 'revoke' ? (channelPolicy ? 'Your microphone is paused until you explicitly resume on the current notice or the channel is known empty.' : 'Your microphone consent has been revoked.') : 'Session capture ended. A known empty channel is required before a new session.' });
     } catch {
       try { if (interaction.deferred) await interaction.editReply({ content: 'Local transcription action unavailable. No consent was assumed.' }); else await deny(interaction); } catch {}
     } finally {
@@ -230,7 +243,7 @@ function createFeature(deps = {}) {
     }
   }
   async function deny(interaction) {
-    await interaction.reply({ content: 'This action requires the current session notice and your presence in its voice channel.', flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
+    await interaction.reply({ content: 'This action requires the current active or latest eligible recording notice and your presence in its voice channel.', flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
   }
   let store;
   return {
@@ -250,12 +263,20 @@ function createFeature(deps = {}) {
         if ((oldState.guild?.id || newState.guild?.id) !== cfg.guildId) return;
         generation++;
         // This executes synchronously before snapshot fetch or coordinator queue.
-        if (oldState.channelId === cfg.channelId && newState.channelId !== cfg.channelId) coordinator?.invalidate(oldState.id || newState.id);
+        if (oldState.channelId === cfg.channelId && newState.channelId !== cfg.channelId) {
+          const id = oldState.id || newState.id;
+          pendingArrivals.delete(id);
+          if (known && gatewayAvailable && coordinator?.departure) coordinator.departure(id);
+          else coordinator?.invalidate(id);
+        }
         if (!known || stopped) return;
+        const arrivalId = gatewayAvailable && oldState.channelId !== cfg.channelId && newState.channelId === cfg.channelId ? newState.id || oldState.id : undefined;
+        const arrival = arrivalId && coordinator?.prepareArrival?.(arrivalId);
+        if (arrival && pendingArrivals.size < 32) pendingArrivals.set(arrivalId, arrival);
         return guarded(refresh);
       } },
       ...[Events.ShardDisconnect, Events.ShardReconnecting, Events.Invalidated].map(name => ({ name, execute() {
-        generation++; gatewayAvailable = false; known = false; invalidateAll();
+        generation++; gatewayAvailable = false; known = false; pendingArrivals.clear(); invalidateAll();
         return guarded(async () => { await coordinator?.membership(null); await coordinator?.fault('GATEWAY_INTERRUPTION'); });
       } })),
       ...[Events.ShardResume, Events.ShardReady].map(name => ({ name, execute() {

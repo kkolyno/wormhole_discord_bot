@@ -10,7 +10,8 @@ test('strict opt-in and attachment approval default off', () => {
   assert.equal(loadConfig(env).consentMode, 'manual');
   assert.equal(loadConfig({ ...env, LOCAL_TRANSCRIPT_ATTACHMENTS: 'TRUE' }).allowAttachments, false);
   assert.equal(loadConfig({ ...env, LOCAL_TRANSCRIPT_ATTACHMENTS: 'true' }).allowAttachments, true);
-  assert.equal(loadConfig(env).limits.emptyGraceMs, 90000);
+  assert.equal(loadConfig(env).limits.emptyGraceMs, 15000);
+  assert.equal(loadConfig(env).limits.idleMs, 300000);
   assert.equal(loadConfig(env).limits.maxSessionMs, 14400000);
 });
 test('consent policy is an exact enum, not a boolean or a trimmed string', () => {

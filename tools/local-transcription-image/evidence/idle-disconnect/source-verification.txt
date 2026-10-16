@@ -1,0 +1,2 @@
+PASS: all app source + package/index hashes match final image
+PASS: every local-transcription test hash matches final image

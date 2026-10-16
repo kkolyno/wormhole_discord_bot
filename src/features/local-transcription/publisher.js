@@ -31,10 +31,10 @@ function sessionPolicy(session) {
   check(mode === 'manual' || mode === 'channel', 'INVALID_CONSENT_MODE');
   return mode;
 }
-function buttons(disabled = false, consentMode = 'manual') {
+function buttons(disabled = false, consentMode = 'manual', startEnabled = false) {
   check(consentMode === 'manual' || consentMode === 'channel', 'INVALID_CONSENT_MODE');
   return [{ type: 1, components: ACTIONS.map(([custom_id, label, style]) => ({ type: 2, custom_id,
-    label: consentMode === 'channel' && custom_id === 'local_transcription_consent' ? 'Resume my microphone' : label, style, disabled })) }];
+    label: consentMode === 'channel' && custom_id === 'local_transcription_consent' ? 'Resume my microphone' : label, style, disabled })).concat([{ type: 2, custom_id: 'local_transcription_start', label: 'Start recording again', style: 1, disabled: !startEnabled }]) }];
 }
 function validateSession(session) {
   check(session?.schema === 1 && ID.test(session.id), 'INVALID_FINAL_SESSION');
@@ -180,11 +180,11 @@ class Publisher {
       const payload = {
         content: sessionPolicy(s) === 'channel' ? '**Local meeting transcription — automatic company consent**\n' +
           'The administrator confirms standing company consent for ALL humans admitted here, including guests and anyone audible through shared microphones. Recording starts automatically with one person in the configured voice channel; no button or notice acknowledgement is required. ' +
-          'Known occupants can be recorded on startup/restart and gateway reconnect. Unknown occupancy pauses capture. End, safety/overload faults and the configured maximum (at most 4 hours) stop automatic capture; they are not bypassed. ' +
+          'Known startup/restart and gateway reconnect occupancy may record unless idle-waiting. Unknown occupancy pauses capture. End, safety/overload faults and the configured maximum (at most 4 hours) stop automatic capture; they are not bypassed. ' +
           '**Stop my microphone** pauses your account across leave/rejoin and restart until you use **Resume my microphone** on this current notice while present, or the channel is known empty. **End recording** stops everyone until known empty. ' +
           'Presence/duration metadata is tracked for all participants. Only authorized, unpaused audio is transcribed. Ensure everyone audible has consented; otherwise stop your mic.\n\n' +
           'Local English recognition runs during the call; a final duration summary and transcript follow completed processing. Discord transports voice and retains posts; no extra STT provider receives audio. Private audio is deleted after processing/recovery. Normal local transcript/metadata retention is 24 hours after session end; outages can delay cleanup. Personal pause account IDs persist until resume/known empty, beyond that retention. ' +
-          'Gaps/overload are incomplete, not silently complete; long output requires approved delivery. Known empty closes after the configured grace. Buttons remain usable while active.' :
+          'Gaps/overload stay incomplete; long output needs approved delivery. Empty grace or inactivity closes capture. Idle waits for fresh arrival or Start; restart alone cannot wake it.' :
           '**Local meeting transcription — consent required**\n' +
           'Only an account that clicks **I consent: record my mic** while in the configured voice channel is subscribed/recorded. Joining alone is NOT consent. Presence/duration metadata is tracked for all participants. ' +
           'Consent ends when you leave, revoke it, the connection is interrupted, or the bot restarts. Rejoining requires fresh consent. ' +
@@ -193,42 +193,60 @@ class Publisher {
           'Nonconsenting accounts are excluded from the transcript. Discord transports voice and retains posted messages; no extra STT provider receives private audio. ' +
           'Private audio is kept while processing/recovery is pending, then deleted. Normal local transcript/metadata retention is 24 hours after the session ends; crashes or unavailable storage can delay cleanup. ' +
           'Overload/outages are reported as incomplete, not silently complete. Long output follows the configured delivery policy.\n' +
-          'The session closes after the channel is empty for the configured grace period. These buttons do not expire while the meeting remains active.',
+          'Empty grace or inactivity closes capture. After inactivity, a fresh arrival or Start can create a new session, still needing fresh mic consent.',
         components: buttons(false, sessionPolicy(s)), allowedMentions: { parse: [] },
       };
       return this.deliver(s, 'notice', 'notice', payload, prior);
     });
   }
+  startEligible(sessionId) {
+    const session = this.store.getSession(sessionId);
+    if (!session || session.phase === 'active' || session.holdUntilEmpty || !['inactivity', 'known_empty'].includes(session.stopReason)) return false;
+    if (this.store.getControl().holdUntilEmpty) return false;
+    const latest = this.store.listSessions().sort((a, b) => (a.lifecycleOrder || 0) - (b.lifecycleOrder || 0) || a.startedAt - b.startedAt).at(-1);
+    return latest?.id === sessionId;
+  }
   async disableKnownNotice(sessionId, record) {
     const closed = { ...record, state: 'closed', closeRequested: true, disabled: false };
     this.store.patchSession(sessionId, { notice: closed });
-    let disabled = false;
+    let disabled = false, startEnabled = record.startEnabled === true;
     if (USER.test(closed.id)) {
       const session = this.store.getSession(sessionId);
       const reason = /^[a-z_]{1,64}$/.test(session.stopReason || '') ? session.stopReason : 'session_closed';
+      const canStart = this.startEligible(sessionId);
       const content = '**Local recording for this session has stopped.**\n' +
         `Reason: ${reason}. No additional microphone audio is being accepted for this session.\n` +
+        (canStart ? 'Not recording. After inactivity, a fresh member arrival (leave/rejoin works) can start a new meeting. While present, use **Start recording again** on the latest eligible notice as a fallback. Start does not resume paused microphones or grant manual consent. Polling/restart alone does not wake inactivity.\n' : '') +
         'This is a recording-status notice, not the final meeting summary. Accepted work must finish or be explicitly accounted for before the final summary is published. ' +
         'Use `/transcription-status` for draining, incomplete, or held-publication status. ' +
         (sessionPolicy(session) === 'channel' ? 'Fixed channel policy: known occupants may record automatically on restart/reconnect, but never through personal pauses, End or safety holds. A known empty channel clears End/personal pauses; safety stops require review.\n' : 'A new session needs fresh consent.\n') +
         (closed.marker ? `Ref: ${closed.marker}` : `Session: ${sessionId}`);
-      try { await this.bounded(() => this.transport.edit(closed.id, { content, components: buttons(true, sessionPolicy(session)), allowedMentions: { parse: [] } })); disabled = true; }
+      try {
+        await this.bounded(() => this.transport.edit(closed.id, { content, components: buttons(true, sessionPolicy(session), canStart), allowedMentions: { parse: [] } }));
+        disabled = true; startEnabled = canStart;
+        // A later session/End may win while PATCH acknowledgement is slow.
+        // Serialize a corrective edit after it; never leave stale Start enabled.
+        if (canStart && !this.startEligible(sessionId)) {
+          await this.bounded(() => this.transport.edit(closed.id, { content, components: buttons(true, sessionPolicy(session)), allowedMentions: { parse: [] } }));
+          startEnabled = false;
+        }
+      }
       catch { /* Exact active-session checks also reject stale enabled buttons. */ }
     }
     const latest = this.store.getSession(sessionId).notice;
-    const result = { ...latest, state: 'closed', closeRequested: true, disabled: latest.disabled === true || disabled };
+    const result = { ...latest, state: 'closed', closeRequested: true, disabled: latest.disabled === true || disabled, startEnabled };
     this.store.patchSession(sessionId, { notice: result }); return result;
   }
   closeNotice(sessionId) {
     return this.single(`close:${sessionId}`, async () => {
       let old = this.store.getSession(sessionId).notice || { state: 'pending' };
-      if (old.state === 'closed' && old.disabled) return old;
+      if (old.state === 'closed' && old.disabled && (!old.startEnabled || this.startEligible(sessionId))) return old;
       // Durable close intent precedes waiting for a concurrent send. Its result
       // cannot resurrect this prompt, even if acknowledgement arrives late.
       this.store.patchSession(sessionId, { notice: { ...old, closeRequested: true } });
       try { await this.inflight.get(`notice:${sessionId}`); } catch { /* reconcile below */ }
       old = this.store.getSession(sessionId).notice;
-      if (old.state === 'closed' && old.disabled) return old;
+      if (old.state === 'closed' && old.disabled && (!old.startEnabled || this.startEligible(sessionId))) return old;
       let id = old.id;
       if (!USER.test(id) && old.marker) id = await this.find(old, 1);
       return this.disableKnownNotice(sessionId, { ...old, ...(id ? { id } : {}) });

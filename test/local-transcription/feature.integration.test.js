@@ -37,7 +37,7 @@ test('real port wiring: lone human notice, authenticated consent/revoke/leave, r
   await until(() => store.listSessions().some(session => session.notice.state === 'sent'));
   const active = store.listSessions().find(session => session.phase === 'active');
   assert.ok(active); assert.equal(audioOpens, 0); assert.equal(active.participants[U].consented, false);
-  assert.equal(sends[0].components[0].components.length, 3);
+  assert.equal(sends[0].components[0].components.length, 4);
   const interaction = () => ({ guildId: G, channelId: A, user: { id: U, bot: false }, message: { id: active.notice.id, author: { id: B } },
     async deferReply() { this.deferred = true; }, async editReply() {}, async reply() {} });
   await first.buttonHandlers.local_transcription_consent(interaction());

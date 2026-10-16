@@ -24,7 +24,11 @@ COMMAND = ["node", "index.js"]
 ENTRYPOINT = ["/sbin/tini", "--", "docker-entrypoint.sh"]
 ENVIRONMENT = {"LOCAL_TRANSCRIPTION_ENABLED": "true", "LOCAL_TRANSCRIPTION_CONSENT_MODE": "channel",
                "LOCAL_TRANSCRIPT_ATTACHMENTS": "false", "LOCAL_TRANSCRIPTION_DATA_DIR": "/data/transcription"}
-ACTIONS = ("snapshot", "resume-snapshot", "status", "prepare", "pull", "activate", "rollback", "verify")
+LEGACY_POLICY, IDLE_POLICY = "meeting-v1", "idle-v2"
+IDLE_ENVIRONMENT = {**ENVIRONMENT, "LOCAL_TRANSCRIPTION_EMPTY_GRACE_SECONDS": "15",
+                    "LOCAL_TRANSCRIPTION_IDLE_SECONDS": "300"}
+ACTIONS = ("snapshot", "resume-snapshot", "snapshot-upgrade", "resume-snapshot-upgrade",
+           "status", "prepare", "pull", "activate", "rollback", "verify")
 MUTATIONS = {"prepare", "pull", "activate", "rollback"}
 # Keep the OLD guard's fixed job vocabulary. Never add an unscanned mutation name.
 PHASES = {"pull": "pull-test", "activate": "activate-test", "rollback": "rollback"}
@@ -111,12 +115,17 @@ class Admin(base.Admin):
                 and config.get("Entrypoint") == ENTRYPOINT and not config.get("Volumes"),
                 "unexpected_meeting_image_contract")
 
+    @staticmethod
+    def identity(config, container, identifier):
+        Admin.container_ok(container, identifier)
+        require(container.get("State", {}).get("Running") is True, "oracle_not_running")
+        require(isinstance(config.get("name"), str) and config["name"]
+                and container.get("Config", {}).get("Labels", {}).get("com.docker.compose.project")
+                == config["name"], "unexpected_compose_project")
+
     def running(self, config, identifier, image, volume=None, meeting=False):
         container = self.fresh_inspect("running-check")
-        self.container_ok(container, identifier)
-        require(container.get("State", {}).get("Running") is True, "oracle_not_running")
-        require(container.get("Config", {}).get("Labels", {}).get("com.docker.compose.project")
-                == config.get("name"), "unexpected_compose_project")
+        self.identity(config, container, identifier)
         if volume:
             self.runtime(config, container, image, volume, meeting)
         else:
@@ -125,6 +134,7 @@ class Admin(base.Admin):
 
     def snapshot(self, previous_path):
         require(not self.store.has("deployment.json"), "snapshot_already_complete")
+        self.record("capture-kind.json", {"kind": "one-shot"})
         previous_store = PrivateStore(previous_path)
         require(previous_store.path != self.store.path, "previous_backup_must_differ")
         self.record("previous-backup.json", {"path": str(previous_store.path)})
@@ -169,23 +179,151 @@ class Admin(base.Admin):
         self.store.put("deployment.json", {"schema": 1, "baseline": anchor, "container": final})
         return {"snapshot_saved": True, "original_image_id": ORIGINAL_ID, "baseline_image_id": ONE_SHOT_ID}
 
-    def baseline(self):
-        data = self.store.get("deployment.json")
-        require(data.get("schema") == 1, "unknown_deployment_schema")
-        saved, baseline = self.saved(), data["baseline"]
-        require(saved["old_id"] == ORIGINAL_ID and baseline["id"] == ONE_SHOT_ID,
-                "unexpected_original_baseline")
-        previous = self.store.get("previous-prepared.json")
-        require(baseline == self.store.get("current-baseline.json")
-                and baseline["file"] == previous["file"]
-                and previous["file"] == base.Admin.make_test_file(saved, previous["image"]),
-                "previous_baseline_changed")
-        base.Admin.verify_test_config(saved, baseline["config"], previous["image"])
-        self.runtime(baseline["config"], data["container"], baseline["image"], base.VOLUME)
-        return baseline
+    @staticmethod
+    def completed(evidence, name, method, params):
+        require(evidence[name + ".request.json"] == {"method": method, "params": params},
+                "previous_phase_intent_changed")
+        submitted, done = evidence[name + ".submitted.json"], evidence[name + ".done.json"]
+        require(set(submitted) == {"filename"} and isinstance(submitted["filename"], str)
+                and submitted["filename"] and set(done) == {"output"}
+                and isinstance(done["output"], str) and "*** ERROR" not in done["output"],
+                "previous_phase_incomplete")
 
     @staticmethod
-    def make_file(saved, image):
+    def first_baseline(saved, data, anchor, previous, pulled):
+        require(data.get("schema") == 1 and set(data) == {"schema", "baseline", "container"},
+                "unknown_deployment_schema")
+        baseline = data["baseline"]
+        require(saved["old_id"] == ORIGINAL_ID and baseline["id"] == ONE_SHOT_ID
+                and base.image_id(baseline["image"].get("Id")) == ONE_SHOT_ID,
+                "unexpected_original_baseline")
+        require(baseline == anchor and baseline["file"] == previous["file"]
+                and previous["file"] == base.Admin.make_test_file(saved, previous["image"])
+                and pulled == {"id": ONE_SHOT_ID}, "previous_baseline_changed")
+        base.Admin.verify_test_config(saved, baseline["config"], previous["image"])
+        Admin.identity(baseline["config"], data["container"], ONE_SHOT_ID)
+        Admin.runtime(baseline["config"], data["container"], baseline["image"], base.VOLUME)
+        return baseline
+
+    def previous_meeting(self, evidence):
+        """Offline, immutable validation: never append observations to the old journal."""
+        saved = self.saved()
+        require(evidence["snapshot.json"] == saved
+                and evidence["original-file.json"] == saved["file"], "previous_original_changed")
+        self.first_baseline(saved, evidence["deployment.json"], evidence["current-baseline.json"],
+                            evidence["previous-prepared.json"], evidence["previous-pulled.json"])
+        prepared = evidence["prepared-file.json"]
+        require(prepared["file"] == self.make_file(saved, prepared["image"], LEGACY_POLICY),
+                "previous_prepared_changed")
+        image = evidence["pulled-contract.json"]
+        self.check_image(image)
+        require(evidence["pulled-image.json"] == {"id": base.image_id(image.get("Id"))},
+                "previous_pulled_changed")
+        for name, command in (("pull-test", "pull " + SERVICE), ("activate-test", base.UP)):
+            self.completed(evidence, name, "doCommand", {
+                "uuid": base.STACK_UUID, "command": command, "command2": ""})
+        self.completed(evidence, "pin-rollback", "doTag", {
+            "srcid": ORIGINAL_ID, "srcimg": "", "srctag": "", "tgtimg": "oracle-rollback",
+            "tgttag": saved["rollback_tag"].split(":", 1)[1]})
+        for suffix in ("request", "submitted", "done"):
+            name = "pin-rollback." + suffix + ".json"
+            require(self.store.get(name) == evidence[name], "previous_original_pin_changed")
+        return prepared, image
+
+    def snapshot_upgrade(self, previous_path):
+        require(not self.store.has("deployment.json"), "snapshot_already_complete")
+        self.record("capture-kind.json", {"kind": "meeting-v1-to-idle-v2"})
+        previous_store = PrivateStore(previous_path)
+        require(previous_store.path != self.store.path, "previous_backup_must_differ")
+        self.record("previous-backup.json", {"path": str(previous_store.path)})
+        require(not any(previous_store.has("rollback-up." + suffix + ".json")
+                        for suffix in ("request", "submitted", "done")), "previous_meeting_rolled_back")
+        previous = Admin(self.client, previous_store, self.deadline)
+        previous.baseline()  # Pure validation of the completed legacy meeting schema.
+        names = ["snapshot.json", "original-file.json", "deployment.json", "current-baseline.json",
+                 "previous-prepared.json", "previous-pulled.json", "prepared-file.json",
+                 "pulled-image.json", "pulled-contract.json"]
+        names += [phase + "." + suffix + ".json" for phase in
+                  ("pin-rollback", "pull-test", "activate-test") for suffix in ("request", "submitted", "done")]
+        evidence = {name: previous_store.get(name) for name in names}
+        self.record("original-file.json", evidence["original-file.json"])
+        self.record("snapshot.json", evidence["snapshot.json"])
+        for suffix in ("request", "submitted", "done"):
+            name = "pin-rollback." + suffix + ".json"
+            self.record(name, evidence[name])
+        self.record("previous-meeting.json", evidence)
+        prepared, recorded_image = self.previous_meeting(evidence)
+        require(self.get_file() == prepared["file"], "stack_source_changed")
+        config = self.fresh_config("upgrade-baseline")
+        self.verify_config(self.saved(), config, prepared["image"], LEGACY_POLICY)
+        identifier = base.image_id(recorded_image.get("Id"))
+        image = self.fresh_inspect("upgrade-baseline-image", identifier)
+        require(image == recorded_image, "previous_meeting_image_changed")
+        require(self.fresh_inspect("upgrade-baseline-tag", prepared["image"]) == image,
+                "previous_meeting_tag_changed")
+        self.verify_pin(self.saved())
+        container = self.running(config, identifier, image, VOLUME, meeting=True)
+        anchor = {"file": prepared["file"], "config": config, "image": image, "id": identifier}
+        self.record("current-baseline.json", anchor)
+        if not self.store.has("baseline-container.json"):
+            self.store.put("baseline-container.json", container)
+        require(self.get_file() == anchor["file"], "stack_source_changed")
+        require(self.fresh_config("upgrade-final-config") == config, "resolved_baseline_changed")
+        final = self.running(config, identifier, image, VOLUME, meeting=True)
+        require(self.fresh_inspect("upgrade-final-tag", prepared["image"]) == image,
+                "previous_meeting_tag_changed")
+        self.verify_pin(self.saved())
+        require(self.get_file() == anchor["file"], "stack_source_changed")
+        self.store.put("deployment.json", {"schema": 2, "policy": IDLE_POLICY,
+                                          "baseline": anchor, "container": final})
+        return {"snapshot_saved": True, "original_image_id": ORIGINAL_ID, "baseline_image_id": identifier}
+
+    def baseline(self):
+        data = self.store.get("deployment.json")
+        saved, baseline = self.saved(), data["baseline"]
+        require(saved["old_id"] == ORIGINAL_ID and saved["old_image"].get("Id") == ORIGINAL_ID
+                and self.store.get("original-file.json") == saved["file"], "unexpected_original_baseline")
+        self.identity(saved["config"], saved["container"], ORIGINAL_ID)
+        policy = self.policy()
+        if policy == LEGACY_POLICY:
+            return self.first_baseline(saved, data, self.store.get("current-baseline.json"),
+                                       self.store.get("previous-prepared.json"),
+                                       self.store.get("previous-pulled.json"))
+        prepared, image = self.previous_meeting(self.store.get("previous-meeting.json"))
+        require(baseline == self.store.get("current-baseline.json")
+                and baseline["file"] == prepared["file"] and baseline["image"] == image
+                and baseline["id"] == image["Id"], "previous_baseline_changed")
+        self.verify_config(saved, baseline["config"], prepared["image"], LEGACY_POLICY)
+        self.identity(baseline["config"], data["container"], baseline["id"])
+        self.runtime(baseline["config"], data["container"], image, VOLUME, meeting=True)
+        return baseline
+
+    def policy(self):
+        data = self.store.get("deployment.json")
+        if data.get("schema") == 1:
+            require(set(data) == {"schema", "baseline", "container"}, "unknown_deployment_policy")
+            return LEGACY_POLICY
+        require(data.get("schema") == 2 and data.get("policy") == IDLE_POLICY
+                and set(data) == {"schema", "policy", "baseline", "container"},
+                "unknown_deployment_policy")
+        return IDLE_POLICY
+
+    @staticmethod
+    def environment(policy):
+        require(policy in {LEGACY_POLICY, IDLE_POLICY}, "unknown_deployment_policy")
+        return ENVIRONMENT if policy == LEGACY_POLICY else IDLE_ENVIRONMENT
+
+    def baseline_running(self, baseline):
+        upgrade = self.policy() == IDLE_POLICY
+        if upgrade:
+            tag = baseline["config"]["services"][SERVICE]["image"]
+            require(self.fresh_inspect("check-upgrade-baseline-tag", tag) == baseline["image"],
+                    "previous_meeting_tag_changed")
+        return self.running(baseline["config"], baseline["id"], baseline["image"],
+                            VOLUME if upgrade else base.VOLUME, meeting=upgrade)
+
+    @staticmethod
+    def make_file(saved, image, policy=LEGACY_POLICY):
         meeting_image(image)
         service = base.Admin.validate_config(saved["config"])
         require(not saved["file"]["override"].strip() and service.get("entrypoint") is None,
@@ -199,19 +337,19 @@ class Admin(base.Admin):
         require(not service.get("volumes"), "existing_mounts_require_manual_plan")
         desired = copy.deepcopy(saved["file"])
         desired["override"] = base.OVERRIDE_COMMENT + json.dumps({"services": {SERVICE: {
-            "image": image, "command": COMMAND, "environment": ENVIRONMENT,
+            "image": image, "command": COMMAND, "environment": Admin.environment(policy),
             "volumes": [{"type": "volume", "source": VOLUME, "target": "/data"}],
             "stop_grace_period": "45s"}}, "volumes": {VOLUME: {"name": VOLUME}}}, sort_keys=True)
         return desired
 
     @staticmethod
-    def verify_config(saved, config, image):
+    def verify_config(saved, config, image, policy=LEGACY_POLICY):
         meeting_image(image)
         expected = copy.deepcopy(saved["config"])
         service = base.Admin.validate_config(expected)
         actual = base.Admin.validate_config(config)
         service.update({"image": image, "command": COMMAND, "stop_grace_period": "45s"})
-        service.setdefault("environment", {}).update(ENVIRONMENT)
+        service.setdefault("environment", {}).update(Admin.environment(policy))
         mounts = actual.get("volumes")
         require(isinstance(mounts, list) and len(mounts) == 1, "meeting_mount_not_resolved")
         mount = mounts[0]
@@ -227,9 +365,9 @@ class Admin(base.Admin):
     def prepared(self):
         self.baseline()
         data = self.store.get("prepared-file.json")
-        require(data["file"] == self.make_file(self.saved(), data["image"]), "prepared_intent_changed")
+        require(data["file"] == self.make_file(self.saved(), data["image"], self.policy()), "prepared_intent_changed")
         require(self.get_file() == data["file"], "stack_source_changed")
-        self.verify_config(self.saved(), self.fresh_config("check-meeting"), data["image"])
+        self.verify_config(self.saved(), self.fresh_config("check-meeting"), data["image"], self.policy())
         return data
 
     def prepare(self, image):
@@ -237,8 +375,9 @@ class Admin(base.Admin):
         require(not self.store.has("activate-test.request.json")
                 and not self.store.has("rollback-up.request.json"), "deployment_already_activated_or_rolled_back")
         self.verify_pin(saved)
-        self.running(baseline["config"], ONE_SHOT_ID, baseline["image"], base.VOLUME)
-        desired = self.make_file(saved, image)
+        self.baseline_running(baseline)
+        require(image != baseline["config"]["services"][SERVICE]["image"], "upgrade_image_must_differ")
+        desired = self.make_file(saved, image, self.policy())
         self.record("prepared-file.json", {"file": desired, "image": image})
         if self.get_file() == baseline["file"]:
             require(self.fresh_config("prepare-baseline") == baseline["config"], "resolved_baseline_changed")
@@ -251,10 +390,11 @@ class Admin(base.Admin):
         require(not self.store.has("activate-test.request.json")
                 and not self.store.has("rollback-up.request.json"), "deployment_already_activated_or_rolled_back")
         self.verify_pin(self.saved())
-        self.running(baseline["config"], ONE_SHOT_ID, baseline["image"], base.VOLUME)
+        self.baseline_running(baseline)
         self.compose("pull-test", "pull")
         image = self.fresh_inspect("pulled-meeting-image", prepared["image"])
         self.check_image(image)
+        require(image["Id"] != baseline["id"], "upgrade_image_must_differ")
         self.record("pulled-image.json", {"id": base.image_id(image["Id"])})
         self.record("pulled-contract.json", image)
         return {"meeting_image_pulled": True, "image_id": image["Id"]}
@@ -265,14 +405,15 @@ class Admin(base.Admin):
         image = self.fresh_inspect("check-meeting-tag", prepared["image"])
         require(base.image_id(image.get("Id")) == identifier, "meeting_tag_changed")
         self.check_image(image)
+        require(identifier != self.baseline()["id"], "upgrade_image_must_differ")
         return identifier, image
 
     def check_current(self, allow_original=False):
         """Reject external runtime drift before either recreation, even on retries."""
         baseline, saved = self.baseline(), self.saved()
         current = self.container_ok(self.fresh_inspect("current-id"))
-        if current == ONE_SHOT_ID:
-            return self.running(baseline["config"], current, baseline["image"], base.VOLUME)
+        if current == baseline["id"]:
+            return self.baseline_running(baseline)
         if current == ORIGINAL_ID:
             require(allow_original, "oracle_image_changed")
             return self.running(saved["config"], current, saved["old_image"])
@@ -286,7 +427,7 @@ class Admin(base.Admin):
         service = config["services"][SERVICE]
         service.update({"image": prepared["image"], "command": COMMAND, "stop_grace_period": "45s",
                         "volumes": [{"type": "volume", "source": VOLUME, "target": "/data"}]})
-        service.setdefault("environment", {}).update(ENVIRONMENT)
+        service.setdefault("environment", {}).update(self.environment(self.policy()))
         config.setdefault("volumes", {})[VOLUME] = {"name": VOLUME}
         return self.running(config, current, image, VOLUME, meeting=True)
 
@@ -298,7 +439,7 @@ class Admin(base.Admin):
         self.check_current()
         self.compose("activate-test", "up")
         config = self.fresh_config("activated-config")
-        self.verify_config(self.saved(), config, prepared["image"])
+        self.verify_config(self.saved(), config, prepared["image"], self.policy())
         self.running(config, identifier, image, VOLUME, meeting=True)
         return {"meeting_container_running": True, "image_id": identifier, "application_ready_verified": False}
 
@@ -312,7 +453,7 @@ class Admin(base.Admin):
         allowed = [baseline["file"], saved["file"], pinned]
         if self.store.has("prepared-file.json"):
             prepared = self.store.get("prepared-file.json")
-            require(prepared["file"] == self.make_file(saved, prepared["image"]), "prepared_intent_changed")
+            require(prepared["file"] == self.make_file(saved, prepared["image"], self.policy()), "prepared_intent_changed")
             allowed.append(prepared["file"])
         current_file = self.get_file()
         require(current_file in allowed, "stack_source_changed")
@@ -327,7 +468,7 @@ class Admin(base.Admin):
         elif current_file == pinned:
             require(config == expected, "rollback_resolved_config_changed")
         else:
-            self.verify_config(saved, config, prepared["image"])
+            self.verify_config(saved, config, prepared["image"], self.policy())
         self.set_file(pinned, allowed)
         require(self.fresh_config("rollback-config") == expected, "rollback_resolved_config_changed")
         self.compose("rollback-up", "up")
@@ -363,16 +504,19 @@ def main(argv=None, client_factory=base.load_client):
     require(args.action not in MUTATIONS or args.authorize_live_change,
             "explicit_live_change_authorization_required")
     require((args.action == "prepare") == (args.image is not None), "image_required_only_for_prepare")
-    capture = args.action in {"snapshot", "resume-snapshot"}
+    capture = args.action in {"snapshot", "resume-snapshot", "snapshot-upgrade", "resume-snapshot-upgrade"}
+    upgrade = args.action in {"snapshot-upgrade", "resume-snapshot-upgrade"}
     require(capture == (args.previous_backup_dir is not None), "previous_backup_required_only_for_snapshot")
     if args.image is not None:
         meeting_image(args.image)
     with StackLock():
-        store = PrivateStore(args.backup_dir, create=args.action == "snapshot")
+        store = PrivateStore(args.backup_dir, create=args.action in {"snapshot", "snapshot-upgrade"})
         instance = Admin(client_factory(), store, args.deadline_seconds)
-        if args.action in MUTATIONS:
+        if args.action in MUTATIONS or upgrade:
             instance.guard_mutations(PHASES.get(args.action, args.action))
-        if capture:
+        if upgrade:
+            result = instance.snapshot_upgrade(args.previous_backup_dir)
+        elif capture:
             result = instance.snapshot(args.previous_backup_dir)
         elif args.action == "prepare":
             result = instance.prepare(args.image)

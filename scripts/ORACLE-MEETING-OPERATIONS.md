@@ -10,7 +10,9 @@ production credentials, OMV, Discord, registry pull, or live deployment was used
 
 Read [the original operations guide](ORACLE-TEST-OPERATIONS.md) for the underlying
 RPC, locking, private storage, timeout, and original rollback contract. This guide
-supersedes its **one-shot** phase instructions for the new journal.
+supersedes its **one-shot** phase instructions for meeting journals. The fresh
+idle-disconnect upgrade uses `snapshot-upgrade` (below); ordinary `snapshot` still
+means the original one-shot → meeting-v1 first activation.
 
 ## Fixed deployment and consent policy
 
@@ -20,7 +22,8 @@ supersedes its **one-shot** phase instructions for the new journal.
   is accepted. No main/latest pull, arbitrary image, shell/exec/RPC escape hatch,
   credential argument, volume operation, or generic restart is available.
 - New override is derived from the **original** baseline, replacing, not merging
-  with, the one-shot override. Original body/env/metadata/booleans remain exact.
+  with, the previous one-shot or meeting override. Original body/env/metadata/
+  booleans remain exact.
   All original service environment, including the existing bot token and channel
   settings, is preserved privately, with only these explicit changes:
 
@@ -30,6 +33,19 @@ supersedes its **one-shot** phase instructions for the new journal.
   LOCAL_TRANSCRIPT_ATTACHMENTS=false
   LOCAL_TRANSCRIPTION_DATA_DIR=/data/transcription
   ```
+
+  A schema-2 **idle upgrade** journal additionally pins these explicit values:
+
+  ```text
+  LOCAL_TRANSCRIPTION_EMPTY_GRACE_SECONDS=15
+  LOCAL_TRANSCRIPTION_IDLE_SECONDS=300
+  ```
+
+  Legacy schema-1 meeting journals keep their exact four-setting `meeting-v1`
+  policy. They are never reinterpreted with the new settings, even after updating
+  the helper. Schema 2 records `policy: idle-v2`; unknown schemas/policies and
+  modified old prepared overrides fail closed. Only `snapshot-upgrade` selects
+  the new policy; there is no arbitrary environment or command flag.
 
   Channel consent is the standing company/channel-consent mode expressly requested
   by the operator, not a silent change to manual consent. Confirm company policy,
@@ -47,12 +63,14 @@ supersedes its **one-shot** phase instructions for the new journal.
   when they retain UID/GID 1001 (`nodejs` or equivalent) and `/app`.
 - Exactly one RW, local named volume `oracle-meeting-transcription-data` at
   `/data`; the image also defaults `LOCAL_TRANSCRIPTION_DATA_DIR` to
-  `/data/transcription`. No old one-shot mount survives the new override.
+  `/data/transcription`. No old one-shot mount survives first activation. An idle
+  upgrade retains the **same** already-mounted meeting volume. It may contain
+  private work: never read, delete, replace, initialize, or chown it.
 - **Never mount, erase, or rearm `oracle-transcription-data`.** It stays retained
   and untouched. Rollback also retains the new volume and never restarts one-shot
   boot code. There are no volume-delete or speech-file-read operations.
 
-## Preconditions / limits requiring parent review
+## First-activation preconditions / limits requiring parent review
 
 1. Confirm GitHub run `38906692896` published the reviewed app
    `ea7ebe62ee5c8ba400599ac0888976809dc48b4f` and ARM64 image. A SHA-shaped tag is
@@ -96,7 +114,7 @@ supersedes its **one-shot** phase instructions for the new journal.
    Sequential fresh observations are not an atomic server-side transaction.
    Same-UID/root filesystem interference is outside the storage safety boundary.
 
-## Exact invocation sequence (parent only; not run by the worker)
+## First-activation sequence (parent only; not run by the worker)
 
 Run from the credential-bearing operator repository **after reviewing these new
 files**, not from the credential-free worker. The only credential location is the
@@ -124,10 +142,112 @@ python3 -B scripts/oracle-meeting-deploy.py status --backup-dir "$BACKUP"
 ```
 
 Each prepare/pull/activate/rollback needs `--authorize-live-change`. Image is
-required **only** for prepare; previous journal is required **only** for
-snapshot/resume-snapshot. No authorization flag is needed for snapshot, status,
-or bounded log verification. `--deadline-seconds 1..600` defaults to 120 per job;
+required **only** for prepare; previous journal is required **only** for the four
+snapshot/resume actions. All captures, status, and bounded log verification are
+read-only remote operations and need no authorization flag.
+`--deadline-seconds 1..600` defaults to 120 per job;
 an in-flight RPC may exceed that by the transport timeout.
+
+## Fresh idle-disconnect upgrade (parent only; not run by the worker)
+
+This is a narrow **completed schema-1 meeting-v1 → schema-2 idle-v2** path, not a
+generic upgrade or migration. Do not rerun first-activation snapshot against a
+meeting journal and do not reuse the previous meeting journal for prepare/up.
+No production checks or deployment were performed by this change's worker.
+
+Preconditions, in addition to the common privacy/runtime/operator constraints:
+
+1. Keep `.private/oracle-meeting-live-ea7ebe62-20261016` and the earlier one-shot
+   journal intact. Operator-supplied expected previous immutable tag is
+   `ghcr.io/kkolyno/wormhole_discord_bot:transcription-ea7ebe62ee5c8ba400599ac0888976809dc48b4f`,
+   full local image ID
+   `sha256:3f606205611626ef1c44ba7011f819661ca131bd30cba3d2d5c84fad19918a4d`.
+   Independently confirm these against the prior deployment/CI evidence; these
+   values are not a fresh observation by this worker. The helper verifies the
+   prior journal's exact source/config/image ID and fresh local tag/runtime,
+   rather than treating a SHA-shaped tag as provenance.
+2. Previous meeting baseline, prepared source, pulled ID/image contract,
+   successful literal `pull-test` and `activate-test` request/submission/done
+   records, and the original pin evidence must validate. There must be **no**
+   previous rollback-up intent/submission/completion. Current runtime must still
+   match that previous meeting exactly, including the named local RW mount,
+   complete effective env/process/user/network/restart, project, and 45s stop
+   timeout. Drift and unknown forms fail closed. Unfinished/ambiguous mutation
+   intents in **any** journal block upgrade capture and all mutations.
+3. The original rollback remains exactly
+   `sha256:b44105db8c52b15918f068653f0c52eaa2d1c2e70cfc0220a2e3b72b9d379edc`,
+   already pinned locally. No pin is created or retagged by upgrade capture.
+   Keep its original source reference local and unchanged for exact rollback.
+4. The **first-activation global volume-absence precondition does not apply**.
+   This upgrade must reuse `oracle-meeting-transcription-data` at `/data`, proven
+   by the prior config plus fresh runtime. Its private contents are retained and
+   never inspected, erased, initialized, or chowned. The one-shot volume and its
+   marker also stay untouched. A new/different mount is not an upgrade workaround.
+5. Review the idle app/build changes and published ARM64 CI provenance separately,
+   including the exact two env names above (`src/features/local-transcription/config.js`
+   currently accepts these names with defaults 15 and 300). Before activation independently
+   compare the helper's freshly pulled full ID and registry digest with CI.
+   The helper validates runtime shape/local tag stability, **not** CI provenance.
+   New tag **and** resulting full ID must differ from the previous meeting.
+
+Reviewed workflow (set `IDLE_COMMIT` to the actual reviewed, published full
+lowercase 40-hex commit; no upcoming commit is invented here):
+
+```sh
+umask 077
+PREVIOUS="$PWD/.private/oracle-meeting-live-ea7ebe62-20261016"
+BACKUP="$PWD/.private/oracle-meeting-idle-live-20261016"
+: "${IDLE_COMMIT:?Set the reviewed published idle-disconnect full 40-hex commit}"
+IMAGE="ghcr.io/kkolyno/wormhole_discord_bot:transcription-$IDLE_COMMIT"
+
+python3 -B scripts/oracle-meeting-deploy.py snapshot-upgrade --backup-dir "$BACKUP" --previous-backup-dir "$PREVIOUS"
+python3 -B scripts/oracle-meeting-deploy.py status --backup-dir "$BACKUP"
+python3 -B scripts/oracle-meeting-deploy.py prepare --backup-dir "$BACKUP" --image "$IMAGE" --authorize-live-change
+python3 -B scripts/oracle-meeting-deploy.py pull --backup-dir "$BACKUP" --authorize-live-change
+
+# STOP: parent compares the newly pulled full ID/digest against reviewed CI evidence.
+# Only after that independent check:
+python3 -B scripts/oracle-meeting-deploy.py activate --backup-dir "$BACKUP" --authorize-live-change
+python3 -B scripts/oracle-meeting-deploy.py status --backup-dir "$BACKUP"
+python3 -B scripts/oracle-meeting-deploy.py verify --backup-dir "$BACKUP"
+
+# Only on the parent's explicit rollback decision; NOT a return to meeting-v1:
+python3 -B scripts/oracle-meeting-deploy.py rollback --backup-dir "$BACKUP" --authorize-live-change
+```
+
+A partial capture is resumed with the same paths and action family:
+
+```sh
+python3 -B scripts/oracle-meeting-deploy.py resume-snapshot-upgrade --backup-dir "$BACKUP" --previous-backup-dir "$PREVIOUS"
+```
+
+Upgrade capture writes **only the fresh journal**, not even read-observation jobs
+in the previous journal. `previous-meeting.json` preserves original snapshot/pin,
+previous baseline, prepared/pulled/image and terminal phase evidence independently.
+The fresh `current-baseline.json`, `baseline-container.json`, and `deployment.json`
+record the current meeting source/config/image/container; fresh final checks run
+on every resume. The old journal remains byte-for-byte untouched. Source kind,
+previous path, captured evidence, and anchored baseline cannot silently change.
+Schema 2 does **not** copy completed pull/up jobs to the fresh journal's active
+phase names: fresh pull and activation always have their own request/submission/
+completion records, using the same guard-compatible `pull-test`/`activate-test`
+literals as before.
+
+Prepare rebuilds the override from the **original source**, not by merging the
+old meeting override; all unrelated env (including existing channel scope), source
+fields, services and stack fields remain exact. It adds the same mount and 45s
+grace plus explicit 15/300 settings, without recreating the current container.
+Activation is one scoped, pull-never, force-recreate up. Compose stops the existing
+Oracle under its 45s grace before replacing it; no second bot/service, concurrent
+canary, extra up, or generic stop/restart/exec command is introduced. Tini, app
+shutdown cleanup and the shared-volume kernel lock are app-owned safeguards that
+must be separately reviewed; the helper does not read or manipulate the lock.
+
+Rollback from the fresh journal restores the **exact original**, not meeting-v1
+or the one-shot image: original full ID, no mount, original source/config after
+local source-tag validation. Both data volumes and every prior journal remain
+retained. The old source-tag-drift recovery and no-duplicate-job behavior below
+apply unchanged.
 
 ## Evidence, validation, phases
 
@@ -139,6 +259,9 @@ symlinks block; nothing is automatically chmodded or overwritten. Public stdout
 is one allowlisted JSON object; errors contain only fixed codes, never raw server
 responses, log lines, filenames, secret values, or exceptions.
 
+- **snapshot-upgrade / resume-snapshot-upgrade**: the separate schema-2 workflow
+  above. Only a completed legacy meeting journal is accepted; ordinary snapshot
+  still accepts only the reviewed one-shot deployment.
 - **snapshot / resume-snapshot**: fresh `previous.saved()`/`previous.prepared()`
   validation checks complete original rollback/runtime and exact current
   one-shot source/config. It also requires the prepared source to be the precise
@@ -201,8 +324,9 @@ names `pull-test`, `activate-test`, `rollback-up` respectively; the copied
 The new CLI maps actions to old guard names, so an error such as
 `pending_mutation_resume_activate_test_same_backup` means **repeat `activate`
 with the new CLI, same meeting journal, and authorization**, not old activate-test.
-An old journal's unfinished phase must instead be resumed by the original helper
-on that old journal. The guards see conflicts in **both directions**.
+An earlier journal's unfinished phase must instead be resumed on that exact
+journal: use the original helper for a one-shot journal, or this meeting helper
+for an earlier meeting journal. The guards see conflicts in **both directions**.
 
 A deadline/interruption never cancels the remote operation. Submitted jobs resume
 saved filename/poll position and aren't duplicated. Pending/failed/ambiguous jobs
@@ -229,7 +353,13 @@ python3 -B -m unittest discover -s tools/oracle-admin-test -p 'test*.py' -v
 ```
 
 Tests synthesize the prior successful one-shot journal through its original fake
-client, then fake every live API. They cover strict images/authorization, source
+client, then fake every live API. The upgrade tests additionally synthesize a
+completed meeting-v1 and a fresh meeting-v2, verify exact original rollback,
+byte-for-byte untouched previous journal, retained same volume, distinct fresh
+pull/up jobs, legacy policy validation, explicit 15/300 settings, rejected prior
+rollback/incomplete/schema/source/env/tag/runtime drift, capture/prepare/up resume,
+and pending mutations across all three journal generations. They cover strict
+images/authorization, source
 and resolved/runtime drift, unrelated fields, exact volume/command/env/stop grace,
 ARM64 image contract/tag drift, original rollback, immutable/private evidence,
 snapshot and job interruption/resume, ambiguous submission, both-direction

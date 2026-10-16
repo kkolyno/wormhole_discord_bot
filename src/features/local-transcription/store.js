@@ -74,6 +74,12 @@ class Store {
     this.atomicFile(path.join(this.root, '.control.json'), control);
     this.control = control; return this.getControl();
   }
+  setIdleWait(idleWait) {
+    if (typeof idleWait !== 'boolean') fail('CONTROL_CORRUPT');
+    const control = { ...this.control, idleWait };
+    this.atomicFile(path.join(this.root, '.control.json'), control);
+    this.control = control; return this.getControl();
+  }
   getAutomaticOptOuts() { return [...(this.control.automaticOptOuts || [])]; }
   setAutomaticOptOut(userId, paused) {
     account(userId);
@@ -94,7 +100,9 @@ class Store {
   }
   validateSession(s) {
     safeId(s.id);
-    if ((s.consentMode !== undefined && !['manual', 'channel'].includes(s.consentMode)) ||
+    if ((s.idleWakePending !== undefined && typeof s.idleWakePending !== 'boolean') ||
+        (s.lifecycleOrder !== undefined && (!Number.isSafeInteger(s.lifecycleOrder) || s.lifecycleOrder < 1)) ||
+        (s.consentMode !== undefined && !['manual', 'channel'].includes(s.consentMode)) ||
         s.schema !== 1 || !['active', 'draining', 'ready', 'published'].includes(s.phase) || !Number.isFinite(s.startedAt) ||
         !Number.isFinite(s.lastSeenAt) || !(s.endedAt === null || Number.isFinite(s.endedAt)) ||
         !s.participants || Array.isArray(s.participants) || Object.keys(s.participants).length > this.limits.maxParticipants ||
@@ -132,7 +140,8 @@ class Store {
       if (name === '.control.json') {
         const control = this.readJson(path.join(this.root, name));
         if (!control || Array.isArray(control) || typeof control.holdUntilEmpty !== 'boolean' ||
-            Object.keys(control).some(key => !['holdUntilEmpty', 'automaticOptOuts'].includes(key)) ||
+            Object.keys(control).some(key => !['holdUntilEmpty', 'automaticOptOuts', 'idleWait'].includes(key)) ||
+            (Object.hasOwn(control, 'idleWait') && typeof control.idleWait !== 'boolean') ||
             (Object.hasOwn(control, 'automaticOptOuts') && (!Array.isArray(control.automaticOptOuts) ||
               control.automaticOptOuts.length > 32 || new Set(control.automaticOptOuts).size !== control.automaticOptOuts.length ||
               control.automaticOptOuts.some(id => typeof id !== 'string' || !ACCOUNT.test(id))))) fail('CONTROL_CORRUPT');
@@ -196,7 +205,8 @@ class Store {
   createSession({ id = randomUUID(), startedAt, participants = {}, consentMode = 'manual' }) {
     safeId(id); if (this.sessions.has(id)) fail('SESSION_EXISTS');
     if (this.sessions.size >= this.limits.maxRetainedSessions) fail('SESSION_LIMIT');
-    const s = this.validateSession({ schema: 1, id, startedAt, consentMode, endedAt: null, lastSeenAt: startedAt, phase: 'active',
+    const lifecycleOrder = Math.max(0, ...this.listSessions().map(s => s.lifecycleOrder || 0)) + 1;
+    const s = this.validateSession({ schema: 1, id, startedAt, consentMode, lifecycleOrder, endedAt: null, lastSeenAt: startedAt, phase: 'active',
       participants: clone(participants), issues: [], stopReason: null, notice: { state: 'pending' }, publication: { state: 'pending' } });
     this.atomic('s', id, s); this.sessions.set(id, s); return clone(s);
   }
@@ -296,6 +306,9 @@ class Store {
     // now enables startup-only expiry of abandoned active/draining records; the
     // caller must hold the writer lock and must not have started a scheduler.
     if (this.listSessions().some(s => s.holdUntilEmpty) && !this.control.holdUntilEmpty) this.setHoldUntilEmpty(true);
+    // A crash inside a wake transaction cannot turn occupied startup into a wake.
+    // Upgrade before retention can remove the interrupted session evidence.
+    if (this.listSessions().some(s => s.idleWakePending) && !this.control.idleWait) this.setIdleWait(true);
     if (now !== undefined) this.prune(now, { recovery: true });
     const interrupted = new Set();
     for (const j of this.listJobs()) {

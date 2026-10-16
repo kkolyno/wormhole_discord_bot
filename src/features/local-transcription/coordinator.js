@@ -1,7 +1,7 @@
 'use strict';
 const { Scheduler } = require('./scheduler');
 const { account, issue, fail } = require('./store');
-const DEFAULTS = Object.freeze({ emptyGraceMs: 90000, quietMs: 850, maxDrainMs: 300000,
+const DEFAULTS = Object.freeze({ emptyGraceMs: 15000, idleMs: 300000, quietMs: 850, maxDrainMs: 300000,
   maxSessionMs: 4 * 60 * 60 * 1000, maxConsenting: 8, maxParticipants: 32,
   maxPacketBytes: 192000, audioOpenMs: 20000, audioCloseMs: 5000 });
 function bounded(promise, ms, code) {
@@ -17,12 +17,17 @@ function finishParticipants(participants, at) {
   return result;
 }
 class Coordinator {
-  constructor({ store, audio, recognize, publisher, now = Date.now, limits = {}, consentMode = 'manual' }) {
+  constructor({ store, audio, recognize, publisher, now = Date.now, elapsedNow, limits = {}, consentMode = 'manual' }) {
     if (!['manual', 'channel'].includes(consentMode)) fail('INVALID_CONSENT_MODE');
     Object.defineProperty(this, 'consentMode', { value: consentMode, enumerable: true });
     Object.assign(this, { store, audio, publisher, now });
+    // Production deadlines use monotonic elapsed time. Preserve custom-now test
+    // clocks unless a separate elapsed clock is explicitly supplied.
+    this.elapsedNow = elapsedNow || (now === Date.now ? () => performance.now() : now);
+    this.emptyResetEpoch = Symbol(); this.emptyElapsedSince = null;
     // Latest synchronous occupancy is a privacy barrier, not queued accounting.
     this.observedMembers = null;
+    this.idleWait = false; this.controlEpoch = Symbol();
     this.limits = { ...DEFAULTS, ...store.limits, ...limits };
     this.current = null; this.members = null; this.emptySince = null; this.holdUntilEmpty = false;
     this.epochs = new Map(); this.tail = Promise.resolve(); this.background = new Set(); this.closures = new Set();
@@ -65,12 +70,14 @@ class Coordinator {
       if (this.initialized) return;
       this.store.recover({ now: this.now() });
       this.holdUntilEmpty = this.store.getControl().holdUntilEmpty;
+      this.idleWait = this.store.getControl().idleWait === true;
       for (const s of this.store.listSessions()) {
         if (s.holdUntilEmpty) this.holdUntilEmpty = true;
         if (s.phase === 'active') {
           const endedAt = Math.max(s.startedAt, s.lastSeenAt);
           this.store.patchSession(s.id, { phase: 'draining', endedAt, participants: finishParticipants(s.participants, endedAt),
-            stopReason: 'restart', captureEof: true, captureCloseAcknowledged: false, drainStartedAt: this.now(),
+            stopReason: this.idleWait ? 'inactivity' : 'restart', idleWakePending: false,
+            captureEof: true, captureCloseAcknowledged: false, drainStartedAt: this.now(),
             issues: [...new Set([...s.issues, 'RESTART_INTERRUPTED'])].slice(0, 64) });
         } else if (s.phase === 'draining') {
           this.store.patchSession(s.id, { captureEof: true, participants: finishParticipants(s.participants, s.endedAt ?? s.lastSeenAt),
@@ -78,7 +85,7 @@ class Coordinator {
             drainStartedAt: this.now() });
         }
         const recovered = this.store.getSession(s.id);
-        if (recovered.phase !== 'active' && (recovered.notice.state !== 'closed' || recovered.notice.disabled !== true))
+        if (recovered.phase !== 'active' && (recovered.notice.state !== 'closed' || recovered.notice.disabled !== true || recovered.notice.startEnabled))
           this.backgroundTask(Promise.resolve().then(() => this.publisher.closeNotice(s.id)), 'NOTICE_CLOSE_FAILED');
       }
       this.initialized = true; this.scheduler.start();
@@ -118,11 +125,61 @@ class Coordinator {
     if (typeof userId !== 'string' || !/^\d{17,20}$/.test(userId)) return;
     for (const rt of this.runtimes) this.invalidateRuntime(rt, userId);
   }
+  departure(userId) {
+    // A real gateway leave is known before its REST snapshot settles. Retain
+    // that absence in the already-bounded observed set so a fast leave/rejoin
+    // cannot disappear when the older fetch is discarded by the adapter epoch.
+    this.invalidate(userId);
+    if (!this.observedMembers?.has(userId)) return;
+    this.observedMembers = new Set(this.observedMembers); this.observedMembers.delete(userId);
+    this.controlEpoch = Symbol();
+    if (this.current) this.current.pendingAuthorization = Symbol();
+  }
   setHold(hold) {
     if (this.store.getControl().holdUntilEmpty !== hold) this.store.setHoldUntilEmpty(hold);
     this.holdUntilEmpty = hold;
   }
-  async membership(members) {
+  setIdleWait(wait) {
+    try {
+      if ((this.store.getControl().idleWait === true) !== wait) this.store.setIdleWait(wait);
+      this.idleWait = wait;
+    } catch {
+      this.emergency('IDLE_CONTROL_FAILED'); this.holdUntilEmpty = true;
+      try { this.store.setHoldUntilEmpty(true); } catch { /* disk failure: stay closed */ }
+      fail('IDLE_CONTROL_FAILED');
+    }
+  }
+  latestWakeNotice(noticeId) {
+    const sessions = this.store.listSessions();
+    const s = this.current?.wakePending && this.current.wakeSource === noticeId
+      ? sessions.find(s => s.notice.id === noticeId)
+      : sessions.sort((a, b) => (a.lifecycleOrder || 0) - (b.lifecycleOrder || 0) || a.startedAt - b.startedAt).at(-1);
+    return s && s.phase !== 'active' && !s.holdUntilEmpty &&
+      ['inactivity', 'known_empty'].includes(s.stopReason) &&
+      s.notice.state === 'closed' && s.notice.id === noticeId ? s : null;
+  }
+  prepareStart(userId, noticeId) {
+    account(userId);
+    if (!this.initialized || this.current || this.stopping || this.failed || this.holdUntilEmpty ||
+        !this.members?.has(userId) || !this.observedMembers?.has(userId) || !this.latestWakeNotice(noticeId)) return null;
+    return { epoch: this.controlEpoch, noticeId, userId };
+  }
+  startAgain(userId, noticeId, token) {
+    return this.enqueue(async () => {
+      if (!token || token.epoch !== this.controlEpoch || token.userId !== userId || token.noticeId !== noticeId ||
+          !this.prepareStart(userId, noticeId)) return false;
+      return this.applyMembership([...this.members.values()], { wake: true, epoch: token.epoch, noticeId });
+    });
+  }
+  prepareArrival(userId) {
+    // Capture eligibility at gateway event time, BEFORE any adapter fetch. An
+    // arrival observed during capture cannot be replayed after inactivity.
+    if (!this.initialized || this.stopping || this.failed || !this.idleWait || this.holdUntilEmpty ||
+        !this.observedMembers || this.observedMembers.has(userId)) return null;
+    account(userId);
+    return { userId, epoch: this.controlEpoch };
+  }
+  async membership(members, { arrivalId, arrivals = arrivalId ? [this.prepareArrival(arrivalId)] : [] } = {}) {
     // Gate invalidation is deliberately outside the serialized queue. Refuse an
     // over-cap snapshot without retaining an arbitrarily large membership map.
     if (members !== null) members = members.filter(m => m.bot !== true && m.user?.bot !== true);
@@ -136,6 +193,14 @@ class Coordinator {
       });
     }
     const ids = members === null ? null : new Set(members.map(m => account(m.id)));
+    // Only gateway-confirmed arrivals with continuous known occupancy count.
+    // Poll/initial/recovery snapshots alone never wake an idle meeting.
+    const wake = this.idleWait && !!this.observedMembers && arrivals.slice(0, this.limits.maxParticipants).some(token =>
+      token && token.epoch === this.controlEpoch && ids?.has(token.userId) && !this.observedMembers.has(token.userId));
+    if (!ids) this.emptyResetEpoch = Symbol();
+    const emptyEpoch = this.emptyResetEpoch;
+    if (!ids || this.observedMembers && [...this.observedMembers].some(id => !ids.has(id))) this.controlEpoch = Symbol();
+    const wakeEpoch = this.controlEpoch;
     if (this.current && (!ids || this.observedMembers && [...this.observedMembers].some(id => !ids.has(id))))
       this.current.pendingAuthorization = Symbol();
     this.observedMembers = ids;
@@ -149,9 +214,8 @@ class Coordinator {
     }
     // Own a bounded copy, never a caller's mutable array during readiness.
     members = members === null ? null : members.map(m => ({ id: m.id, name: String(m.name || m.id).slice(0, 128) }));
-    if (this.consentMode !== 'channel') return this.enqueue(() => this.applyMembership(members));
     const optedOut = new Set(this.store.getAutomaticOptOuts());
-    if (ids && [...ids].filter(id => !optedOut.has(id)).length > this.limits.maxConsenting) {
+    if (this.consentMode === 'channel' && ids && [...ids].filter(id => !optedOut.has(id)).length > this.limits.maxConsenting) {
       // A later smaller poll must not coalesce away an observed safety cap.
       if (this.current) { this.current.accepting = false; this.current.gates.clear(); }
       return this.enqueue(() => this.applyMembership(members));
@@ -161,25 +225,27 @@ class Coordinator {
     // Preserve empty/unknown barriers even when polling coalesces the payload.
     if (this.pendingMembership && this.pendingMembership.tail === this.tail) {
       this.pendingMembership.members = members;
+      if (members?.length === 0) this.pendingMembership.emptyEpoch = emptyEpoch;
       this.pendingMembership.empty ||= members?.length === 0;
       this.pendingMembership.unknown ||= members === null;
+      if (wake) this.pendingMembership.wakeEpoch = wakeEpoch;
       return this.pendingMembership.task;
     }
-    const pending = { members, empty: members?.length === 0, unknown: members === null };
+    const pending = { members, empty: members?.length === 0, emptyEpoch, unknown: members === null, wakeEpoch: wake ? wakeEpoch : null };
     this.pendingMembership = pending;
     pending.task = this.enqueue(async () => {
       if (this.pendingMembership === pending) this.pendingMembership = null;
       if (pending.unknown && pending.members !== null) await this.applyMembership(null);
-      if (pending.empty && pending.members?.length !== 0) await this.applyMembership([]);
-      return this.applyMembership(pending.members);
+      if (pending.empty && pending.members?.length !== 0) await this.applyMembership([], { emptyEpoch: pending.emptyEpoch });
+      return this.applyMembership(pending.members, { wake: !!pending.wakeEpoch, epoch: pending.wakeEpoch, emptyEpoch: pending.emptyEpoch });
     });
     pending.tail = this.tail;
     return pending.task;
   }
-  async applyMembership(members) {
+  async applyMembership(members, wakeRequest = {}) {
     if (!this.initialized || this.stopping || this.failed) return false;
     if (members === null) {
-      this.members = null; this.emptySince = null;
+      this.members = null; this.emptySince = null; this.emptyElapsedSince = null;
       if (this.current) {
         const s = this.store.getSession(this.current.id);
         this.store.patchSession(s.id, { participants: finishParticipants(s.participants, s.lastSeenAt) });
@@ -195,12 +261,26 @@ class Coordinator {
     this.members = snapshot;
     const now = this.now();
     if (!snapshot.size) {
-      if (this.emptySince === null) this.emptySince = now;
-      this.setHold(false);
-      for (const s of this.store.listSessions()) if (s.holdUntilEmpty) this.store.patchSession(s.id, { holdUntilEmpty: false });
-    } else this.emptySince = null;
-    if (!this.current && snapshot.size && !this.holdUntilEmpty && this.startSession(now) === false) return false;
-    const rt = this.current; if (!rt) return true;
+      if (this.emptySince === null) { this.emptySince = now; this.emptyElapsedSince = this.elapsedNow(); }
+      // Reset authority belongs to the observation, not its later queue slot.
+      // An older coalesced empty must never erase a newer End/safety decision.
+      if (wakeRequest.emptyEpoch === this.emptyResetEpoch) {
+        this.setHold(false); this.setIdleWait(false);
+        for (const s of this.store.listSessions()) if (s.holdUntilEmpty) this.store.patchSession(s.id, { holdUntilEmpty: false });
+      }
+    } else { this.emptySince = null; this.emptyElapsedSince = null; }
+    const waking = !this.current && snapshot.size && wakeRequest.wake && wakeRequest.epoch === this.controlEpoch;
+    if (!this.current && snapshot.size && !this.holdUntilEmpty && (!this.idleWait || waking)) {
+      if (this.startSession(now, waking ? wakeRequest : null) === false) return false;
+    }
+    const rt = this.current;
+    if (!rt) {
+      if (this.consentMode === 'channel' && snapshot.size &&
+          [...snapshot.keys()].filter(id => !this.store.getAutomaticOptOuts().includes(id)).length > this.limits.maxConsenting) {
+        this.lastIssue = 'CONSENT_LIMIT'; this.setHold(true); return false;
+      }
+      return true;
+    }
     const s = this.store.getSession(rt.id), participants = s.participants;
     const distinct = new Set([...Object.keys(participants), ...snapshot.keys()]);
     if (distinct.size > this.limits.maxParticipants) { this.stopCurrent('participant_limit', 'PARTICIPANT_LIMIT', true); return false; }
@@ -229,9 +309,21 @@ class Coordinator {
       const grants = eligible.map(id => [id, rt.epochs.get(id) || 0]);
       for (const [id, epoch] of grants) await this.grant(rt, id, epoch, { automatic: true });
     }
+    if (rt.wakePending) {
+      if (this.current !== rt || rt.endRequested || rt.wakeEpoch !== this.controlEpoch || !this.observedMembers?.size || this.holdUntilEmpty || !rt.accepting) {
+        if (this.current === rt && !rt.endRequested) {
+          if (rt.safetyFault || rt.gatewayFault) this.stopCurrent('capture_fault', rt.safetyFault || rt.gatewayFault, !!rt.safetyFault);
+          else this.stopCurrent('inactivity', !this.observedMembers ? 'OCCUPANCY_UNKNOWN' : null, this.holdUntilEmpty);
+        }
+        return false;
+      }
+      // A crash between these writes recovers as idle-wait, never an implicit wake.
+      this.setIdleWait(false);
+      this.store.patchSession(rt.id, { idleWakePending: false }); rt.wakePending = false;
+    }
     return true;
   }
-  startSession(now) {
+  startSession(now, wakeRequest = null) {
     if (this.members.size > this.limits.maxParticipants) { this.setHold(true); this.lastIssue = 'PARTICIPANT_LIMIT'; return; }
     this.store.prune(now);
     let s;
@@ -240,9 +332,17 @@ class Coordinator {
       if (e.safeCode !== 'SESSION_LIMIT') throw e;
       this.lastIssue = 'SESSION_LIMIT'; this.setHold(true); return false;
     }
-    const rt = { id: s.id, gates: new Set(), jobs: new Map(), handle: null, accepting: true, eof: false,
+    if (wakeRequest) {
+      if (!wakeRequest.noticeId) wakeRequest.noticeId = this.store.listSessions().findLast(record => record.id !== s.id && record.stopReason === 'inactivity')?.notice.id;
+      this.store.patchSession(s.id, { idleWakePending: true });
+    }
+    const rt = { id: s.id, lastActivityAt: this.elapsedNow(), captureAuthorized: false,
+      wakePending: !!wakeRequest, wakeEpoch: wakeRequest?.epoch, wakeSource: wakeRequest?.noticeId,
+      gates: new Set(), jobs: new Map(), handle: null, accepting: true, eof: false,
       opening: null, closePromise: null, closing: false, physicalClosed: true, epochs: new Map(), subscriptionTails: new Map(), receivedBytes: 0, acceptedBytes: 0, rejectedBytes: 0 };
     this.current = rt; this.epochs = rt.epochs; this.runtimes.add(rt);
+    for (const old of this.store.listSessions()) if (old.id !== s.id && old.notice.startEnabled)
+      this.backgroundTask(Promise.resolve().then(() => this.publisher.closeNotice(old.id)), 'NOTICE_CLOSE_FAILED');
     this.backgroundTask(Promise.resolve().then(() => this.publisher.notice(s.id)), 'NOTICE_FAILED_OR_UNCERTAIN');
   }
   validNotice(rt, noticeId) { if (!rt || rt.closing) return false;
@@ -257,6 +357,7 @@ class Coordinator {
   }
   grantValid(rt, userId, epoch, { automatic, noticeId }) {
     if (!rt || this.current !== rt || !rt.accepting || rt.closing || rt.endRequested || this.stopping || this.failed ||
+        rt.wakePending && rt.wakeEpoch !== this.controlEpoch ||
         !this.members?.has(userId) || !this.observedMembers?.has(userId) ||
         (rt.epochs.get(userId) || 0) !== epoch) return false;
     const s = this.store.getSession(rt.id);
@@ -288,6 +389,7 @@ class Coordinator {
         try { this.store.setAutomaticOptOut(userId, false); }
         catch { this.optOutFailure(); return false; }
       }
+      if (!rt.captureAuthorized) { rt.captureAuthorized = true; rt.lastActivityAt = this.elapsedNow(); }
       rt.gates.add(userId);
       const s = this.store.getSession(rt.id), participants = s.participants;
       participants[userId].consented = true; participants[userId].everConsented = true;
@@ -318,12 +420,26 @@ class Coordinator {
   }
   async revoke(userId, noticeId) {
     account(userId);
+    // Closed controls can still conservatively cancel a pending Start. They
+    // never Resume a mic, and never affect an independently active new meeting.
+    const closed = this.latestWakeNotice(noticeId);
+    if ((!this.current || this.current.wakePending && this.current.wakeSource === noticeId) &&
+        closed && (closed.participants[userId] || this.observedMembers?.has(userId))) {
+      this.emptyResetEpoch = Symbol(); this.controlEpoch = Symbol(); this.invalidate(userId);
+      if (this.consentMode === 'channel') {
+        try { this.store.setAutomaticOptOut(userId, true); }
+        catch { this.optOutFailure(); fail('AUTOMATIC_OPTOUT_FAILED'); }
+      }
+      return true;
+    }
     // A still-closing notice can revoke only its own runtime, never a new one.
     const rt = [...this.runtimes].find(r => {
       const s = this.store.getSession(r.id);
       return s && s.notice.id === noticeId && ['sent', 'closed'].includes(s.notice.state);
     });
     if (!rt) return false;
+    this.emptyResetEpoch = Symbol(); this.controlEpoch = Symbol();
+    if (this.current?.wakePending && this.current.wakeSource === noticeId) this.invalidate(userId);
     if (this.current === rt) {
       // Fence every previously queued explicit grant, including accounts whose
       // observation/accounting is still pending or has just become unknown.
@@ -343,9 +459,21 @@ class Coordinator {
   }
   async end(noticeId) {
     const rt = this.current;
+    if ((!rt || rt.wakePending && rt.wakeSource === noticeId) && this.latestWakeNotice(noticeId)) {
+      this.emptyResetEpoch = Symbol(); this.controlEpoch = Symbol(); this.setHold(true);
+      const source = this.latestWakeNotice(noticeId);
+      if (source) this.backgroundTask(Promise.resolve().then(() => this.publisher.closeNotice(source.id)), 'NOTICE_CLOSE_FAILED');
+      if (rt) {
+        rt.endRequested = true; rt.requestedEndAt = this.now(); rt.accepting = false; rt.gates.clear();
+        const s = this.store.getSession(rt.id);
+        rt.endParticipants = finishParticipants(s.participants, this.members === null ? s.lastSeenAt : rt.requestedEndAt);
+      }
+      return this.enqueue(() => { if (rt && this.current === rt) this.stopCurrent('explicit_end', null, true); return true; });
+    }
     // Exact notice validation precedes the synchronous privacy barrier. Neither
     // queued lifecycle work nor pending voice readiness may extend acceptance.
     if (!this.validNotice(rt, noticeId) || rt.endRequested) return false;
+    this.emptyResetEpoch = Symbol(); this.controlEpoch = Symbol();
     rt.endRequested = true; rt.accepting = false; rt.gates.clear();
     const endedAt = this.now(), s = this.store.getSession(rt.id);
     rt.requestedEndAt = endedAt;
@@ -373,6 +501,7 @@ class Coordinator {
     void this.fault(issue(code)).catch(() => {});
   }
   async fault(code) {
+    this.emptyResetEpoch = Symbol(); this.controlEpoch = Symbol();
     this.lastIssue = issue(code);
     const rt = this.current;
     const recoverable = this.consentMode === 'channel' &&
@@ -384,6 +513,11 @@ class Coordinator {
       if (recoverable) rt.gatewayFault = issue(code); else rt.safetyFault = issue(code);
     }
     if (recoverable) this.observedMembers = null; // requires a new trustworthy snapshot
+    else if (!rt) {
+      this.setHold(true); // safety decisions also win during idle-wait
+      for (const s of this.store.listSessions()) if (s.notice.startEnabled)
+        this.backgroundTask(Promise.resolve().then(() => this.publisher.closeNotice(s.id)), 'NOTICE_CLOSE_FAILED');
+    }
     return this.enqueue(() => {
       if (rt && this.current === rt) this.stopCurrent('capture_fault', rt.safetyFault || issue(code), !recoverable || !!rt.safetyFault);
     });
@@ -427,6 +561,9 @@ class Coordinator {
         accepted += count; rt.acceptedBytes += count; cursor.lastAt = atMs;
         if (j.bytes + count === this.store.limits.maxUtteranceBytes) this.flush(rt, userId);
       }
+      // Exact-zero suppression only, NOT semantic speech/noise detection.
+      // Never trust packet timestamps or old/draining receiver tails for idle.
+      if (this.current === rt && !rt.closing && pcm.some(byte => byte !== 0)) rt.lastActivityAt = this.elapsedNow();
       return true;
     } catch (e) {
       rt.rejectedBytes += size - accepted; rt.accepting = false; rt.gates.clear();
@@ -449,14 +586,20 @@ class Coordinator {
     // gateway teardown may perform its close, but cannot downgrade its hold or
     // move its frozen timestamp later.
     if (rt.endRequested) { reason = 'explicit_end'; hold = true; endedAt = rt.requestedEndAt; }
+    // Commit the idle barrier BEFORE detaching capture or notifying clients.
+    if (reason === 'inactivity' || rt.wakePending) this.setIdleWait(true);
+    this.controlEpoch = Symbol();
     rt.closing = true;
     this.setHold(hold);
     const s = this.store.getSession(rt.id), now = this.now();
+    // Wall time is presentation, not elapsed authority. Rollback may collapse a
+    // reported duration to zero, but must not make a sealed result unpublishable.
+    endedAt = Math.max(s.startedAt, endedAt);
     this.store.patchSession(rt.id, { phase: 'draining', endedAt, lastSeenAt: endedAt, stopReason: reason,
       participants: rt.endParticipants || finishParticipants(s.participants, this.members === null ? Math.min(s.lastSeenAt, endedAt) : endedAt),
-      drainStartedAt: now, captureEof: false, captureCloseAcknowledged: false, holdUntilEmpty: hold,
+      drainStartedAt: now, captureEof: false, captureCloseAcknowledged: false, holdUntilEmpty: hold, idleWakePending: false,
       issues: code ? [...new Set([...s.issues, issue(code)])].slice(0, 64) : s.issues });
-    this.current = null; this.emptySince = null;
+    this.current = null; this.emptySince = null; this.emptyElapsedSince = null;
     this.backgroundTask(Promise.resolve().then(() => this.publisher.closeNotice(rt.id)), 'NOTICE_CLOSE_FAILED');
     const closing = (async () => {
       let closeAcknowledged = !rt.handle && !rt.opening;
@@ -499,15 +642,17 @@ class Coordinator {
   async tick() {
     return this.enqueue(() => {
       if (!this.initialized || this.stopping || this.failed) return;
-      const now = this.now(), rt = this.current;
+      const now = this.now(), elapsed = this.elapsedNow(), rt = this.current;
       if (rt) {
         for (const [id, cursor] of rt.jobs) if (now - cursor.lastAt > this.limits.quietMs) this.flush(rt, id);
         if (this.members !== null) this.store.patchSession(rt.id, { lastSeenAt: now,
           receivedBytes: rt.receivedBytes, acceptedBytes: rt.acceptedBytes, rejectedBytes: rt.rejectedBytes });
         const s = this.store.getSession(rt.id);
         if (now - s.startedAt >= this.limits.maxSessionMs) this.stopCurrent('duration_limit', null, true);
-        else if (this.members?.size === 0 && this.emptySince !== null && now - this.emptySince >= this.limits.emptyGraceMs)
+        else if (this.members?.size === 0 && this.observedMembers?.size === 0 && this.emptySince !== null && elapsed - this.emptyElapsedSince >= this.limits.emptyGraceMs)
           this.stopCurrent('known_empty', null, false, this.emptySince);
+        else if (this.members?.size > 0 && this.observedMembers?.size > 0 && elapsed - rt.lastActivityAt >= this.limits.idleMs)
+          this.stopCurrent('inactivity', null, false);
       }
       for (const s of this.store.listSessions()) {
         if (s.phase !== 'draining') continue;
@@ -554,6 +699,7 @@ class Coordinator {
       incomplete: records.filter(r => r.issues.length > 0).length,
       held: records.filter(r => ['held', 'uncertain'].includes(r.publication.state)).length,
       consentMode: this.consentMode, automaticOptOuts: this.store.getAutomaticOptOuts().length,
+      idleWait: this.idleWait, emptyGraceMs: this.limits.emptyGraceMs, idleMs: this.limits.idleMs,
       holdUntilEmpty: this.holdUntilEmpty, issue: this.lastIssue, ...this.store.status(), scheduler: this.scheduler.status() };
   }
 }

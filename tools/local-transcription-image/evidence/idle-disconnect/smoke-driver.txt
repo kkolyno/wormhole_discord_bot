@@ -1,0 +1,9 @@
+transcription-smoke-12295-fixture
+transcription-smoke-12295-data
+6f3cd02104369a7d0c1cff1f016d67e78a33b23ba26083fab22ab36c90694e63
+transcription-smoke-12295-loader
+6fdd9e4594e991761e241e35d1e62eb3a528d09aac5b81584ceab4668b047a9f
+Flag --time has been deprecated, use --timeout instead
+transcription-smoke-12295-holder
+transcription-smoke-12295-holder
+PASS: offline image/public fixture/helper and actual cross-container flock; evidence: tools/local-transcription-image/evidence/idle-disconnect

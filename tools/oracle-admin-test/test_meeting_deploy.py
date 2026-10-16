@@ -28,6 +28,8 @@ fixture = load("meeting_old_fixture", ROOT / "tools/oracle-admin-test/test_admin
 SECRET = fixture.SECRET
 NEW = "sha256:" + "9" * 64
 IMAGE = meeting.REPOSITORY + ":transcription-" + "ea7ebe62ee5c8ba400599ac0888976809dc48b4f"
+IDLE_ID = "sha256:" + "7" * 64
+IDLE_IMAGE = meeting.REPOSITORY + ":transcription-" + "6" * 40
 
 
 class FakeOMV(fixture.FakeOMV):
@@ -42,10 +44,17 @@ class FakeOMV(fixture.FakeOMV):
         self.hold_command = None
         self.logs = "Starting Wormhole Bot...\nLogged in as " + SECRET + "\nDISCORD_LOGIN_FAILED\n"
 
+    def meeting_defaults(self, identifier):
+        defaults = copy.deepcopy(self.new_defaults)
+        if identifier == IDLE_ID:
+            defaults["Env"] += ["LOCAL_TRANSCRIPTION_EMPTY_GRACE_SECONDS=15",
+                                "LOCAL_TRANSCRIPTION_IDLE_SECONDS=300"]
+        return defaults
+
     def container(self):
         original = self.defaults
-        if self.running_id == NEW:
-            self.defaults = self.new_defaults
+        if self.running_id in {NEW, IDLE_ID}:
+            self.defaults = self.meeting_defaults(self.running_id)
         try:
             result = super().container()
         finally:
@@ -78,15 +87,17 @@ class FakeOMV(fixture.FakeOMV):
             if command == "pull " + meeting.SERVICE and meeting.IMAGE_RE.fullmatch(
                     self.config()["services"][meeting.SERVICE]["image"]):
                 assert params == {"uuid": meeting.base.STACK_UUID, "command": command, "command2": ""}
-                self.images[self.config()["services"][meeting.SERVICE]["image"]] = NEW
-                self.images[NEW] = NEW
+                tag = self.config()["services"][meeting.SERVICE]["image"]
+                identifier = IDLE_ID if tag == IDLE_IMAGE else NEW
+                self.images[tag] = identifier
+                self.images[identifier] = identifier
                 return self.submit(method, params, SECRET)
             if command == self.hold_command:
                 self.hold_next = True
         if service == "Compose" and method == "doDockerImageCmd" and (
-                meeting.IMAGE_RE.fullmatch(params["id"]) or params["id"] == NEW):
+                meeting.IMAGE_RE.fullmatch(params["id"]) or params["id"] in {NEW, IDLE_ID}):
             assert params == {"command": "inspect", "id": params["id"]}
-            defaults = copy.deepcopy(self.new_defaults)
+            defaults = self.meeting_defaults(self.images[params["id"]])
             defaults["User"] = self.image_user
             return self.submit(method, params, json.dumps([{"Id": self.images[params["id"]],
                 "Config": defaults, "Architecture": self.architecture, "Os": "linux"}]))
@@ -160,6 +171,22 @@ class MeetingTests(unittest.TestCase):
     def mutation_calls(self):
         return [(m, p) for s, m, p in self.fake.calls if m == "setFile" or m == "doTag"
                 or m == "doCommand" and p["command"] in {meeting.base.UP, "pull " + meeting.SERVICE}]
+
+    def upgrade_cli(self, action, extra=(), expected=0, directory=None, previous=None):
+        args = [action, "--backup-dir", str(directory or self.root / ".private/idle"), *extra]
+        if action in {"snapshot-upgrade", "resume-snapshot-upgrade"}:
+            args += ["--previous-backup-dir", str(previous or self.directory)]
+        return self.invoke(meeting, args, expected)
+
+    def upgrade(self, phase="activate"):
+        self.activate()
+        self.upgrade_cli("snapshot-upgrade")
+        for action in ("prepare", "pull", "activate"):
+            extra = ["--image", IDLE_IMAGE] if action == "prepare" else []
+            self.upgrade_cli(action, ["--authorize-live-change", *extra])
+            if action == phase:
+                break
+        return meeting.Admin(self.fake, meeting.PrivateStore(self.root / ".private/idle"))
 
     def test_lifecycle_preserves_unrelated_and_exact_original_rollback(self):
         instance = self.activate()
@@ -450,6 +477,320 @@ class MeetingTests(unittest.TestCase):
             self.cli("pull", ["--authorize-live-change"], expected=1)
         self.assertEqual(self.cli("pull", ["--authorize-live-change"], expected=1)["code"],
                          "ambiguous_submission_do_not_retry")
+
+    def test_upgrade_full_lifecycle_fresh_jobs_same_volume_and_exact_original(self):
+        first = self.activate()
+        previous_bytes = {p.name: p.read_bytes() for p in self.directory.iterdir()}
+        first_config = copy.deepcopy(self.fake.config())
+        first_mount = copy.deepcopy(self.fake.container()["Mounts"])
+        count = len(self.mutation_calls())
+        self.upgrade_cli("snapshot-upgrade")
+        instance = meeting.Admin(self.fake, meeting.PrivateStore(self.root / ".private/idle"))
+        self.assertEqual(len(self.mutation_calls()), count)
+        self.assertEqual(instance.policy(), meeting.IDLE_POLICY)
+        self.assertEqual(instance.baseline()["id"], NEW)
+        self.assertEqual(instance.baseline()["config"], first_config)
+        self.assertEqual(instance.store.get("snapshot.json"), first.saved())
+        self.assertEqual(instance.store.get("previous-meeting.json")["deployment.json"],
+                         first.store.get("deployment.json"))
+        for name in ("pull-test", "activate-test"):
+            self.assertFalse(instance.store.has(name + ".request.json"))
+            self.assertFalse(instance.store.has(name + ".done.json"))
+        self.upgrade_cli("prepare", ["--authorize-live-change", "--image", IDLE_IMAGE])
+        self.assertEqual(self.fake.running_id, NEW)
+        self.assertEqual(self.fake.container()["Mounts"], first_mount)
+        config = self.fake.config()
+        self.assertEqual(config["services"]["unrelated"], self.original["services"]["unrelated"])
+        target = config["services"][meeting.SERVICE]
+        self.assertEqual(target["environment"], {
+            **self.original["services"][meeting.SERVICE]["environment"], **meeting.IDLE_ENVIRONMENT})
+        self.assertEqual(target["stop_grace_period"], "45s")
+        self.assertEqual(config["volumes"], first_config["volumes"])
+        self.assertNotIn(meeting.base.VOLUME, json.dumps(config))
+        for field in meeting.base.FILE_FIELDS - {"override"}:
+            self.assertEqual(self.fake.file[field], first.saved()["file"][field])
+        self.upgrade_cli("pull", ["--authorize-live-change"])
+        self.upgrade_cli("pull", ["--authorize-live-change"])
+        self.upgrade_cli("activate", ["--authorize-live-change"])
+        self.assertEqual(self.fake.running_id, IDLE_ID)
+        self.assertEqual(self.fake.container()["Mounts"], first_mount)
+        self.assertEqual(self.fake.container()["Config"]["StopTimeout"], 45)
+        env = self.fake.container()["Config"]["Env"]
+        self.assertIn("LOCAL_TRANSCRIPTION_EMPTY_GRACE_SECONDS=15", env)
+        self.assertIn("LOCAL_TRANSCRIPTION_IDLE_SECONDS=300", env)
+        self.upgrade_cli("rollback", ["--authorize-live-change"])
+        self.assertEqual(self.fake.file, first.saved()["file"])
+        self.assertEqual(self.fake.config(), self.original)
+        self.assertEqual(self.fake.running_id, meeting.ORIGINAL_ID)
+        self.assertEqual(self.fake.container()["Mounts"], [])
+        self.assertEqual({p.name: p.read_bytes() for p in self.directory.iterdir()}, previous_bytes)
+        self.assertEqual(sum(m == "doCommand" and p["command"] == meeting.base.UP
+                             for s, m, p in self.fake.calls), 3)
+        self.assertEqual(sum(m == "doCommand" and p["command"] == "pull " + meeting.SERVICE
+                             for s, m, p in self.fake.calls), 2)
+        self.assertFalse(any("volume" in m.lower() or "exec" in m.lower()
+                             for s, m, p in self.fake.calls))
+
+    def test_upgrade_cli_authorization_and_no_raw_flags(self):
+        for action in meeting.MUTATIONS:
+            extra = ["--image", IDLE_IMAGE] if action == "prepare" else []
+            self.assertEqual(self.upgrade_cli(action, extra, expected=1)["code"],
+                             "explicit_live_change_authorization_required")
+        for args in (["snapshot-upgrade"], ["prepare", "--authorize-live-change", "--image", IDLE_IMAGE,
+                                          "--previous-backup-dir", str(self.directory)],
+                     ["snapshot-upgrade", "--previous-backup-dir", str(self.directory), "--command", "up"],
+                     ["snapshot-upgrade", "--previous-backup-dir", str(self.directory), "--image", IDLE_IMAGE]):
+            self.invoke(meeting, [*args, "--backup-dir", str(self.root / ".private/idle")], expected=1)
+        self.assertEqual(self.fake.calls, [])
+
+    def test_upgrade_requires_completed_meeting_not_one_shot_or_unknown_schema(self):
+        self.upgrade_cli("snapshot-upgrade", previous=self.previous, expected=1)
+        self.activate()
+        self.upgrade_cli("resume-snapshot-upgrade", previous=self.directory, expected=1)
+        # A fresh journal accepts the valid previous meeting, not a reused partial source.
+        other = self.root / ".private/valid-idle"
+        self.upgrade_cli("snapshot-upgrade", directory=other)
+        data = json.loads((self.directory / "deployment.json").read_text())
+        data["schema"] = 99
+        (self.directory / "deployment.json").write_text(json.dumps(data))
+        self.upgrade_cli("snapshot-upgrade", directory=self.root / ".private/invalid-idle", expected=1)
+        self.assertFalse((self.root / ".private/invalid-idle/deployment.json").exists())
+
+    def test_upgrade_rejects_prior_incomplete_or_rollback_evidence(self):
+        self.activate()
+        cases = [("activate-test.done.json", None), ("pull-test.done.json", {"output": "*** ERROR"}),
+                 ("activate-test.request.json", {"method": "doCommand", "params": {"command": "up"}}),
+                 ("rollback-up.done.json", {"output": ""}),
+                 ("pin-rollback.request.json", {"method": "doTag", "params": {"srcid": NEW}}),
+                 ("pulled-image.json", {"id": IDLE_ID})]
+        for index, (name, replacement) in enumerate(cases):
+            with self.subTest(name=name):
+                path = self.directory / name
+                original = path.read_bytes() if path.exists() else None
+                if replacement is None:
+                    path.unlink()
+                elif original is None:
+                    meeting.PrivateStore(self.directory).put(name, replacement)
+                else:
+                    path.write_text(json.dumps(replacement))
+                self.fake.calls.clear()
+                self.upgrade_cli("snapshot-upgrade", directory=self.root / f".private/bad-{index}", expected=1)
+                self.assertEqual(self.mutation_calls(), [])
+                if original is None:
+                    path.unlink()
+                else:
+                    path.write_bytes(original)
+
+    def test_upgrade_snapshot_rejects_source_resolved_env_tag_and_runtime_drift(self):
+        self.activate()
+        source = copy.deepcopy(self.fake.file)
+        mutations = [lambda: self.fake.file.update(env=self.fake.file["env"] + "DRIFT=true\n"),
+                     lambda: setattr(self.fake, "poison_config", True),
+                     lambda: self.fake.images.update({IMAGE: IDLE_ID}),
+                     lambda: setattr(self.fake, "runtime_mutator", lambda c: c["Config"].update(Env=[])),
+                     lambda: setattr(self.fake, "runtime_mutator", lambda c: c["Config"].update(StopTimeout=10)),
+                     lambda: setattr(self.fake, "runtime_mutator", lambda c: c["Mounts"][0].update(Name="other")),
+                     lambda: setattr(self.fake, "runtime_mutator", lambda c: c["HostConfig"].update(Binds=["/host:/data:rw"]))]
+        for index, mutate in enumerate(mutations):
+            with self.subTest(index=index):
+                mutate()
+                self.fake.calls.clear()
+                self.upgrade_cli("snapshot-upgrade", directory=self.root / f".private/drift-{index}", expected=1)
+                self.assertEqual(self.mutation_calls(), [])
+                self.fake.file = copy.deepcopy(source)
+                self.fake.poison_config = False
+                self.fake.images[IMAGE] = NEW
+                self.fake.runtime_mutator = lambda c: None
+
+    def test_upgrade_snapshot_resume_fresh_and_previous_untouched(self):
+        self.activate()
+        previous_bytes = {p.name: p.read_bytes() for p in self.directory.iterdir()}
+        original_put = meeting.PrivateStore.put
+        def interrupt(store, name, value):
+            if name == "deployment.json":
+                raise RuntimeError(SECRET)
+            return original_put(store, name, value)
+        with mock.patch.object(meeting.PrivateStore, "put", interrupt):
+            self.upgrade_cli("snapshot-upgrade", expected=1)
+        self.fake.file["body"] += "# drift\n"
+        self.upgrade_cli("resume-snapshot-upgrade", expected=1)
+        self.fake.file["body"] = self.fake.file["body"].removesuffix("# drift\n")
+        self.upgrade_cli("resume-snapshot-upgrade")
+        self.assertEqual({p.name: p.read_bytes() for p in self.directory.iterdir()}, previous_bytes)
+        self.upgrade_cli("resume-snapshot-upgrade", expected=1)
+
+    def test_upgrade_policy_does_not_reinterpret_legacy_prepared_source(self):
+        first = self.activate()
+        original_prepared = first.store.get("prepared-file.json")
+        self.assertEqual(first.policy(), meeting.LEGACY_POLICY)
+        self.assertEqual(first.prepared(), original_prepared)
+        self.assertNotIn("LOCAL_TRANSCRIPTION_IDLE_SECONDS", original_prepared["file"]["override"])
+        self.upgrade_cli("snapshot-upgrade")
+        self.assertEqual(first.prepared(), original_prepared)
+        # Neither injecting a new policy into schema 1 nor editing old prepared env migrates it.
+        changed = copy.deepcopy(original_prepared)
+        changed["file"] = first.make_file(first.saved(), IMAGE, meeting.IDLE_POLICY)
+        (self.directory / "prepared-file.json").write_text(json.dumps(changed))
+        self.upgrade_cli("snapshot-upgrade", directory=self.root / ".private/migrated", expected=1)
+
+    def test_upgrade_prepare_requires_different_tag_and_pull_requires_different_id(self):
+        self.activate()
+        self.upgrade_cli("snapshot-upgrade")
+        self.assertEqual(self.upgrade_cli("prepare", ["--authorize-live-change", "--image", IMAGE], expected=1)["code"],
+                         "upgrade_image_must_differ")
+        # A distinct full-SHA tag pointing at the old image is not a fresh upgrade.
+        alias = meeting.REPOSITORY + ":transcription-" + "5" * 40
+        self.upgrade_cli("prepare", ["--authorize-live-change", "--image", alias])
+        self.assertEqual(self.upgrade_cli("pull", ["--authorize-live-change"], expected=1)["code"],
+                         "upgrade_image_must_differ")
+        self.assertFalse((self.root / ".private/idle/pulled-image.json").exists())
+
+    def test_upgrade_environment_and_whole_config_are_exact(self):
+        instance = self.upgrade("prepare")
+        config = self.fake.config()
+        instance.verify_config(instance.saved(), config, IDLE_IMAGE, meeting.IDLE_POLICY)
+        mutations = [lambda c: c["services"][meeting.SERVICE]["environment"].pop("LOCAL_TRANSCRIPTION_IDLE_SECONDS"),
+                     lambda c: c["services"][meeting.SERVICE]["environment"].update(LOCAL_TRANSCRIPTION_IDLE_SECONDS="301"),
+                     lambda c: c["services"][meeting.SERVICE]["environment"].update(LOCAL_TRANSCRIPTION_EMPTY_GRACE_SECONDS="16"),
+                     lambda c: c["services"][meeting.SERVICE]["environment"].update(ALERTS_CHANNEL_ID="other"),
+                     lambda c: c["services"][meeting.SERVICE]["volumes"][0].update(source="another-volume"),
+                     lambda c: c["services"][meeting.SERVICE].update(stop_grace_period="30s")]
+        for mutate in mutations:
+            altered = copy.deepcopy(config)
+            mutate(altered)
+            with self.assertRaises(meeting.Blocked):
+                instance.verify_config(instance.saved(), altered, IDLE_IMAGE, meeting.IDLE_POLICY)
+        self.fake.poison_config = True
+        count = len(self.mutation_calls())
+        self.upgrade_cli("pull", ["--authorize-live-change"], expected=1)
+        self.assertEqual(len(self.mutation_calls()), count)
+
+    def test_upgrade_interrupted_activation_resumes_and_blocks_all_other_journals(self):
+        self.upgrade("pull")
+        self.fake.hold_command = meeting.base.UP
+        counter = itertools.count()
+        with mock.patch.object(meeting.base.time, "sleep"), mock.patch.object(
+                meeting.base.time, "monotonic", side_effect=lambda: next(counter) / 10):
+            self.assertEqual(self.upgrade_cli("activate", ["--authorize-live-change", "--deadline-seconds", "1"],
+                                              expected=1)["code"], "background_deadline_resume_same_phase")
+        count = len(self.mutation_calls())
+        for operation in (lambda: self.upgrade_cli("rollback", ["--authorize-live-change"], expected=1),
+                          lambda: self.cli("rollback", ["--authorize-live-change"], expected=1),
+                          lambda: self.old_cli("rollback", ["--authorize-live-change"], expected=1)):
+            self.assertEqual(operation()["code"], "pending_mutation_resume_activate_test_same_backup")
+        self.assertEqual(len(self.mutation_calls()), count)
+        self.fake.hold = False
+        self.fake.hold_command = None
+        self.upgrade_cli("activate", ["--authorize-live-change"])
+        self.upgrade_cli("activate", ["--authorize-live-change"])
+        self.assertEqual(sum(m == "doCommand" and p["command"] == meeting.base.UP
+                             for s, m, p in self.fake.calls), 2)
+        self.upgrade_cli("prepare", ["--authorize-live-change", "--image", IDLE_IMAGE], expected=1)
+        self.upgrade_cli("pull", ["--authorize-live-change"], expected=1)
+
+    def test_upgrade_capture_and_mutations_block_pending_previous_or_one_shot(self):
+        self.activate()
+        request = {"method": "doCommand", "params": {
+            "uuid": meeting.base.STACK_UUID, "command": meeting.base.UP, "command2": ""}}
+        for previous in (self.previous, self.directory):
+            with self.subTest(previous=previous.name):
+                store = meeting.PrivateStore(previous)
+                store.put("rollback-up.request.json", request)
+                store.put("rollback-up.submitted.json", {"filename": "/private/not-polled"})
+                target = self.root / (".private/pending-" + previous.name)
+                count = len(self.mutation_calls())
+                self.assertEqual(self.upgrade_cli("snapshot-upgrade", directory=target, expected=1)["code"],
+                                 "pending_mutation_resume_rollback_same_backup")
+                self.assertEqual(self.upgrade_cli("prepare", ["--authorize-live-change", "--image", IDLE_IMAGE],
+                                                  directory=target, expected=1)["code"],
+                                 "pending_mutation_resume_rollback_same_backup")
+                self.assertEqual(len(self.mutation_calls()), count)
+                (previous / "rollback-up.request.json").unlink()
+                (previous / "rollback-up.submitted.json").unlink()
+
+    def test_upgrade_accepts_exact_named_binds_and_retains_mount(self):
+        def binds(container):
+            if container["Mounts"]:
+                container["HostConfig"]["Mounts"] = None
+                container["HostConfig"]["Binds"] = [container["Mounts"][0]["Name"] + ":/data:rw"]
+        self.fake.runtime_mutator = binds
+        self.upgrade()
+        self.assertEqual(self.fake.container()["HostConfig"]["Binds"], [meeting.VOLUME + ":/data:rw"])
+        self.upgrade_cli("rollback", ["--authorize-live-change"])
+        self.assertEqual(self.fake.container()["Mounts"], [])
+
+    def test_upgrade_previous_tag_drift_after_capture_blocks_prepare(self):
+        self.activate()
+        self.upgrade_cli("snapshot-upgrade")
+        self.fake.images[IMAGE] = IDLE_ID
+        count = len(self.mutation_calls())
+        self.assertEqual(self.upgrade_cli("prepare", ["--authorize-live-change", "--image", IDLE_IMAGE],
+                                          expected=1)["code"], "previous_meeting_tag_changed")
+        self.assertEqual(len(self.mutation_calls()), count)
+
+    def test_upgrade_fresh_tag_drift_blocks_before_recreation(self):
+        self.upgrade("pull")
+        self.fake.images[IDLE_IMAGE] = NEW
+        count = len(self.mutation_calls())
+        self.assertEqual(self.upgrade_cli("activate", ["--authorize-live-change"], expected=1)["code"],
+                         "meeting_tag_changed")
+        self.assertEqual(len(self.mutation_calls()), count)
+
+    def test_upgrade_post_up_env_timeout_and_rollback_runtime_are_verified(self):
+        self.upgrade("pull")
+        def drift(container):
+            if container["Image"] == IDLE_ID:
+                container["Config"]["Env"] = [v for v in container["Config"]["Env"]
+                                             if not v.startswith("LOCAL_TRANSCRIPTION_IDLE_SECONDS=")]
+        self.fake.runtime_mutator = drift
+        self.assertEqual(self.upgrade_cli("activate", ["--authorize-live-change"], expected=1)["code"],
+                         "runtime_environment_mismatch")
+        count = len(self.mutation_calls())
+        self.upgrade_cli("rollback", ["--authorize-live-change"], expected=1)
+        self.assertEqual(len(self.mutation_calls()), count)
+        self.fake.runtime_mutator = lambda c: c["Config"].update(StopTimeout=10) if c["Image"] == IDLE_ID else None
+        self.assertEqual(self.upgrade_cli("activate", ["--authorize-live-change"], expected=1)["code"],
+                         "runtime_stop_timeout_mismatch")
+        self.fake.runtime_mutator = lambda c: None
+        self.upgrade_cli("activate", ["--authorize-live-change"])
+        self.assertEqual(sum(m == "doCommand" and p["command"] == meeting.base.UP
+                             for s, m, p in self.fake.calls), 2)
+
+    def test_upgrade_schema2_policy_and_baseline_cannot_silently_change(self):
+        instance = self.upgrade("prepare")
+        path = instance.store.path / "deployment.json"
+        original = path.read_text()
+        mutations = [lambda d: d.update(policy="meeting-v1"), lambda d: d.pop("policy"),
+                     lambda d: d.update(schema=3), lambda d: d.update(unreviewed=True),
+                     lambda d: d["baseline"].update(id=meeting.ONE_SHOT_ID),
+                     lambda d: d["container"].update(Image=IDLE_ID)]
+        for mutate in mutations:
+            altered = json.loads(original)
+            mutate(altered)
+            path.write_text(json.dumps(altered))
+            with self.assertRaises(meeting.Blocked):
+                instance.baseline()
+        path.write_text(original)
+        instance.baseline()
+
+    def test_upgrade_lost_prepare_response_no_duplicate_and_rollback_before_up(self):
+        self.activate()
+        self.upgrade_cli("snapshot-upgrade")
+        before = len(self.mutation_calls())
+        real_rpc = self.fake.rpc
+        def lost(service, method, params):
+            result = real_rpc(service, method, params)
+            if method == "setFile":
+                raise RuntimeError(SECRET)
+            return result
+        with mock.patch.object(self.fake, "rpc", lost):
+            self.upgrade_cli("prepare", ["--authorize-live-change", "--image", IDLE_IMAGE], expected=1)
+        self.upgrade_cli("prepare", ["--authorize-live-change", "--image", IDLE_IMAGE])
+        self.assertEqual(len(self.mutation_calls()), before + 1)
+        self.upgrade_cli("rollback", ["--authorize-live-change"])
+        self.assertEqual(self.fake.running_id, meeting.ORIGINAL_ID)
+        self.assertEqual(self.fake.container()["Mounts"], [])
+        self.upgrade_cli("activate", ["--authorize-live-change"], expected=1)
 
 
 if __name__ == "__main__":

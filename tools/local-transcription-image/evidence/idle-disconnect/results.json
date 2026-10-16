@@ -1,0 +1,68 @@
+{
+  "sandbox": "sb_df91079a",
+  "taskTag": "local-transcription-dev:idle-20261016",
+  "imageId": "sha256:36ffb423696853c63d0b5950fec157fb3ccd537869f5755ce93e9271a6f6090b",
+  "platform": "linux/arm64",
+  "imageNode": "22.22.0",
+  "workerNode": "24.18.0",
+  "sourceManifestSha256": "7ae6a4c94911b03cee50773d0d4d48dbcfaa8a4dd12c020d0d862713103d917b",
+  "imageSourceAndTestsExactlyMatchWorker": true,
+  "workerTests": {
+    "total": 282,
+    "fail": 0,
+    "skip": 1,
+    "skipReason": "ffmpeg unavailable in worker; passes in image",
+    "pass": 281
+  },
+  "imageTests": {
+    "total": 282,
+    "fail": 0,
+    "skip": 0,
+    "pass": 282
+  },
+  "staticImageContract": {
+    "pass": 5,
+    "fail": 0
+  },
+  "publicFixtureSha256": "59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e",
+  "publicHelperPcmBytes": 1536000,
+  "publicHelperWallMs": 1326,
+  "crossContainerLockExclusionAndReacquire": "pass",
+  "attachmentsPolicyChanged": false,
+  "productionCredentialsUsed": false,
+  "discordLoginOrLiveAudio": false,
+  "privateAudioUsed": false,
+  "gitOperations": false,
+  "publishedOrDeployed": false,
+  "limits": [
+    "Synthetic/fake Discord and audio integration, not real gateway/DAVE receive proof",
+    "Native DAVE load and Opus roundtrip only",
+    "Public-fixture smoke is not private-call accuracy or sustained target-hardware capacity evidence",
+    "Remote edit failure can leave stale presentation but core authorization remains fail closed",
+    "Arbitrary persistent disk failure cannot guarantee a newly durable hold write",
+    "Monotonic inactivity/empty deadlines only; wall rollback may under-report displayed durations, and existing scheduler/recovery/drain/retention clocks are unchanged"
+  ],
+  "testManifestSha256": "6ee694b362136bcff9785aeb5ef5c982abf877a0cd0bb23bbb4789afa6d45f07",
+  "reviewRegressions": {
+    "newTests": 17,
+    "initialFocusedBefore": {
+      "total": 64,
+      "pass": 58,
+      "fail": 6,
+      "evidence": "review-regressions-before.txt"
+    },
+    "originalImageRollbackBefore": {
+      "total": 2,
+      "pass": 0,
+      "fail": 2,
+      "imageId": "sha256:6418f8e8cc61959a73471653e24c1d43a25c1c57b3661a2ef8afc2c18e2b1f5b",
+      "evidence": "review-rollback-before.txt"
+    },
+    "finalFocusedAfter": {
+      "total": 75,
+      "pass": 75,
+      "fail": 0,
+      "evidence": "review-regressions-after.txt"
+    }
+  }
+}

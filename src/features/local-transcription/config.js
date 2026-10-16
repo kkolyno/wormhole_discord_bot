@@ -22,7 +22,8 @@ function loadConfig(env = process.env) {
     allowAttachments: env.LOCAL_TRANSCRIPT_ATTACHMENTS === 'true',
     restTimeoutMs: 10000,
     limits: Object.freeze({
-      emptyGraceMs: integer(env, 'LOCAL_TRANSCRIPTION_EMPTY_GRACE_SECONDS', 90, 1, 3600) * 1000,
+      emptyGraceMs: integer(env, 'LOCAL_TRANSCRIPTION_EMPTY_GRACE_SECONDS', 15, 1, 3600) * 1000,
+      idleMs: integer(env, 'LOCAL_TRANSCRIPTION_IDLE_SECONDS', 300, 1, 14400) * 1000,
       maxSessionMs: integer(env, 'LOCAL_TRANSCRIPTION_MAX_SESSION_SECONDS', 14400, 1, 14400) * 1000,
       maxDrainMs: integer(env, 'LOCAL_TRANSCRIPTION_MAX_DRAIN_SECONDS', 300, 1, 300) * 1000,
       maxSpoolBytes: 256 * 1024 * 1024, maxPendingJobs: 128,

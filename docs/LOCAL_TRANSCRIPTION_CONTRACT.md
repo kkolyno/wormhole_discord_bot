@@ -74,7 +74,12 @@ explain standing consent, not falsely that accounts clicked. Status shows fixed
 incomplete or held publication without transcript text, account IDs or untrusted text.
 
 End after continuously KNOWN empty channel for configured empty grace (default
-90s); one person remaining does not end the call. Unknown occupancy is not empty.
+15s). A known occupied session also ends after 300s without accepted authorized
+nonzero audio; unknown occupancy is not empty or a successful inactivity trigger.
+Durable idle-wait prevents occupied polling/restart loops. Fresh authenticated
+arrival/leave-rejoin or guarded Start on the latest eligible closed notice may
+start a new session without bypassing manual consent, personal pauses, End or
+safety holds. See `IDLE_DISCONNECT_CONTRACT.md` for the complete later extension.
 Explicit end, max duration, capture fault/overload and restart mark appropriate
 reasons; interruptions are explicit incomplete. Metadata tracks ALL participants
 and accumulated durations. Recover active session durations only to last durable

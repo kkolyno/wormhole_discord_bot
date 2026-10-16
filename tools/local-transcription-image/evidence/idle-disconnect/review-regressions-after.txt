@@ -1,0 +1,460 @@
+TAP version 13
+# Subtest: channel policy captures a lone brain dump before notice acknowledgement; canonical waits for end and jobs
+ok 1 - channel policy captures a lone brain dump before notice acknowledgement; canonical waits for end and jobs
+  ---
+  duration_ms: 96.702111
+  type: 'test'
+  ...
+# Subtest: channel policy never starts for a bots-only room
+ok 2 - channel policy never starts for a bots-only room
+  ---
+  duration_ms: 6.393679
+  type: 'test'
+  ...
+# Subtest: manual policy still never opens audio without a current participant click
+ok 3 - manual policy still never opens audio without a current participant click
+  ---
+  duration_ms: 42.963433
+  type: 'test'
+  ...
+# Subtest: trusted gateway recovery automatically opens a new channel-policy session without a click
+ok 4 - trusted gateway recovery automatically opens a new channel-policy session without a click
+  ---
+  duration_ms: 83.906129
+  type: 'test'
+  ...
+# Subtest: deliberate End survives occupied restart; known empty resets it and next lone join starts automatically
+ok 5 - deliberate End survives occupied restart; known empty resets it and next lone join starts automatically
+  ---
+  duration_ms: 84.230759
+  type: 'test'
+  ...
+# Subtest: personal Stop beats stalled acknowledgement and survives polling, nonempty rejoin and restart; Resume is deliberate
+ok 6 - personal Stop beats stalled acknowledgement and survives polling, nonempty rejoin and restart; Resume is deliberate
+  ---
+  duration_ms: 123.048089
+  type: 'test'
+  ...
+# Subtest: manual real feature: idle closed notice Start wakes only session control, preserving pauses
+ok 7 - manual real feature: idle closed notice Start wakes only session control, preserving pauses
+  ---
+  duration_ms: 102.04965
+  type: 'test'
+  ...
+# Subtest: channel real feature: idle closed notice Start wakes only session control, preserving pauses
+ok 8 - channel real feature: idle closed notice Start wakes only session control, preserving pauses
+  ---
+  duration_ms: 97.579708
+  type: 'test'
+  ...
+# Subtest: real feature: idle ignores gateway recovery and restart snapshots; arrival/rejoin while others stay wakes it
+ok 9 - real feature: idle ignores gateway recovery and restart snapshots; arrival/rejoin while others stay wakes it
+  ---
+  duration_ms: 102.315321
+  type: 'test'
+  ...
+# Subtest: real feature: unknown to known snapshot alone is not a fresh member arrival
+ok 10 - real feature: unknown to known snapshot alone is not a fresh member arrival
+  ---
+  duration_ms: 99.015187
+  type: 'test'
+  ...
+# Subtest: real feature: Start authenticates guild, alerts room, bot author, latest notice and current voice presence
+ok 11 - real feature: Start authenticates guild, alerts room, bot author, latest notice and current voice presence
+  ---
+  duration_ms: 84.175925
+  type: 'test'
+  ...
+# Subtest: real feature: stop fences Start stalled at snapshot
+ok 12 - real feature: stop fences Start stalled at snapshot
+  ---
+  duration_ms: 45.782351
+  type: 'test'
+  ...
+# Subtest: real feature: end fences Start stalled at snapshot
+ok 13 - real feature: end fences Start stalled at snapshot
+  ---
+  duration_ms: 54.024265
+  type: 'test'
+  ...
+# Subtest: real feature: unknown fences Start stalled at snapshot
+ok 14 - real feature: unknown fences Start stalled at snapshot
+  ---
+  duration_ms: 44.499332
+  type: 'test'
+  ...
+# Subtest: real feature: stop fences Start stalled at acknowledgement
+ok 15 - real feature: stop fences Start stalled at acknowledgement
+  ---
+  duration_ms: 48.229471
+  type: 'test'
+  ...
+# Subtest: real feature: end fences Start stalled at acknowledgement
+ok 16 - real feature: end fences Start stalled at acknowledgement
+  ---
+  duration_ms: 59.682517
+  type: 'test'
+  ...
+# Subtest: real feature: unknown fences Start stalled at acknowledgement
+ok 17 - real feature: unknown fences Start stalled at acknowledgement
+  ---
+  duration_ms: 57.087936
+  type: 'test'
+  ...
+# Subtest: real feature: slow Start acknowledgement succeeds when still current; slow new notice POST does not gate channel capture
+ok 18 - real feature: slow Start acknowledgement succeeds when still current; slow new notice POST does not gate channel capture
+  ---
+  duration_ms: 115.479309
+  type: 'test'
+  ...
+# Subtest: real feature: End on closed source notice beats Start during slow new voice ready
+ok 19 - real feature: End on closed source notice beats Start during slow new voice ready
+  ---
+  duration_ms: 93.139183
+  type: 'test'
+  ...
+# Subtest: real feature: late notice acknowledgement after idle and subsequent wake never re-enables stale Start
+ok 20 - real feature: late notice acknowledgement after idle and subsequent wake never re-enables stale Start
+  ---
+  duration_ms: 91.259614
+  type: 'test'
+  ...
+# Subtest: real feature: fresh arrival survives a superseding mute snapshot and wakes exactly once
+ok 21 - real feature: fresh arrival survives a superseding mute snapshot and wakes exactly once
+  ---
+  duration_ms: 100.359958
+  type: 'test'
+  ...
+# Subtest: real feature: retained arrival evidence is fenced by later stop
+ok 22 - real feature: retained arrival evidence is fenced by later stop
+  ---
+  duration_ms: 48.223554
+  type: 'test'
+  ...
+# Subtest: real feature: retained arrival evidence is fenced by later end
+ok 23 - real feature: retained arrival evidence is fenced by later end
+  ---
+  duration_ms: 56.846099
+  type: 'test'
+  ...
+# Subtest: real feature: retained arrival evidence is fenced by later safety
+ok 24 - real feature: retained arrival evidence is fenced by later safety
+  ---
+  duration_ms: 60.012772
+  type: 'test'
+  ...
+# Subtest: real feature: retained arrival evidence is fenced by later unknown
+ok 25 - real feature: retained arrival evidence is fenced by later unknown
+  ---
+  duration_ms: 49.279903
+  type: 'test'
+  ...
+# Subtest: real feature: retained arrival evidence is fenced by later disconnect
+ok 26 - real feature: retained arrival evidence is fenced by later disconnect
+  ---
+  duration_ms: 48.798604
+  type: 'test'
+  ...
+# Subtest: real feature: retained arrival absent from the final snapshot cannot wake
+ok 27 - real feature: retained arrival absent from the final snapshot cannot wake
+  ---
+  duration_ms: 57.238397
+  type: 'test'
+  ...
+# Subtest: real feature: arrival observed before inactivity cannot replay after its delayed snapshot
+ok 28 - real feature: arrival observed before inactivity cannot replay after its delayed snapshot
+  ---
+  duration_ms: 108.677874
+  type: 'test'
+  ...
+# Subtest: real feature: a fast leave/rejoin wakes idle even when the older leave snapshot is still blocked
+ok 29 - real feature: a fast leave/rejoin wakes idle even when the older leave snapshot is still blocked
+  ---
+  duration_ms: 115.718354
+  type: 'test'
+  ...
+# Subtest: core/config defaults and strict bounded idle env are 15s and 300s
+ok 30 - core/config defaults and strict bounded idle env are 15s and 300s
+  ---
+  duration_ms: 1.332562
+  type: 'test'
+  ...
+# Subtest: manual: known empty closes at exactly 15 seconds; unknown restarts grace and cannot complete quiet
+ok 31 - manual: known empty closes at exactly 15 seconds; unknown restarts grace and cannot complete quiet
+  ---
+  duration_ms: 44.952797
+  type: 'test'
+  ...
+# Subtest: manual: never-spoke session idles at exact 300s and occupied polling never reopens it
+ok 32 - manual: never-spoke session idles at exact 300s and occupied polling never reopens it
+  ---
+  duration_ms: 28.953016
+  type: 'test'
+  ...
+# Subtest: manual: accepted nonzero PCM resets using trusted coordinator clock; exact zero and excluded users do not
+ok 33 - manual: accepted nonzero PCM resets using trusted coordinator clock; exact zero and excluded users do not
+  ---
+  duration_ms: 53.434423
+  type: 'test'
+  ...
+# Subtest: manual: Start preserves personal Stops and never grants manual consent
+ok 34 - manual: Start preserves personal Stops and never grants manual consent
+  ---
+  duration_ms: 48.965857
+  type: 'test'
+  ...
+# Subtest: manual: trustworthy new arrival and leave/rejoin wake while others remain, not ordinary changed snapshots
+ok 35 - manual: trustworthy new arrival and leave/rejoin wake while others remain, not ordinary changed snapshots
+  ---
+  duration_ms: 105.189864
+  type: 'test'
+  ...
+# Subtest: manual: unknown recovery/initial snapshot do not count as joins; known empty resets idle
+ok 36 - manual: unknown recovery/initial snapshot do not count as joins; known empty resets idle
+  ---
+  duration_ms: 63.354863
+  type: 'test'
+  ...
+# Subtest: manual: no manual consent/paused/revoked callbacks cannot keep a session alive
+ok 37 - manual: no manual consent/paused/revoked callbacks cannot keep a session alive
+  ---
+  duration_ms: 28.403841
+  type: 'test'
+  ...
+# Subtest: channel: known empty closes at exactly 15 seconds; unknown restarts grace and cannot complete quiet
+ok 38 - channel: known empty closes at exactly 15 seconds; unknown restarts grace and cannot complete quiet
+  ---
+  duration_ms: 43.322606
+  type: 'test'
+  ...
+# Subtest: channel: never-spoke session idles at exact 300s and occupied polling never reopens it
+ok 39 - channel: never-spoke session idles at exact 300s and occupied polling never reopens it
+  ---
+  duration_ms: 36.670298
+  type: 'test'
+  ...
+# Subtest: channel: accepted nonzero PCM resets using trusted coordinator clock; exact zero and excluded users do not
+ok 40 - channel: accepted nonzero PCM resets using trusted coordinator clock; exact zero and excluded users do not
+  ---
+  duration_ms: 68.979072
+  type: 'test'
+  ...
+# Subtest: channel: Start preserves personal Stops and never grants manual consent
+ok 41 - channel: Start preserves personal Stops and never grants manual consent
+  ---
+  duration_ms: 69.243785
+  type: 'test'
+  ...
+# Subtest: channel: trustworthy new arrival and leave/rejoin wake while others remain, not ordinary changed snapshots
+ok 42 - channel: trustworthy new arrival and leave/rejoin wake while others remain, not ordinary changed snapshots
+  ---
+  duration_ms: 119.698705
+  type: 'test'
+  ...
+# Subtest: channel: unknown recovery/initial snapshot do not count as joins; known empty resets idle
+ok 43 - channel: unknown recovery/initial snapshot do not count as joins; known empty resets idle
+  ---
+  duration_ms: 54.274061
+  type: 'test'
+  ...
+# Subtest: channel: no manual consent/paused/revoked callbacks cannot keep a session alive
+ok 44 - channel: no manual consent/paused/revoked callbacks cannot keep a session alive
+  ---
+  duration_ms: 38.107486
+  type: 'test'
+  ...
+# Subtest: idle drains accepted EOF and waits for sealed/accounted terminal results; new open waits physical close
+ok 45 - idle drains accepted EOF and waits for sealed/accounted terminal results; new open waits physical close
+  ---
+  duration_ms: 78.626508
+  type: 'test'
+  ...
+# Subtest: idle clock starts at actual capture authorization after slow ready
+ok 46 - idle clock starts at actual capture authorization after slow ready
+  ---
+  duration_ms: 31.870684
+  type: 'test'
+  ...
+# Subtest: invalid/rejected packets never reset idle and faults remain explicit incomplete safety stops
+ok 47 - invalid/rejected packets never reset idle and faults remain explicit incomplete safety stops
+  ---
+  duration_ms: 113.356194
+  type: 'test'
+  ...
+# Subtest: restart, retention and gateway recovery preserve bounded idle-wait and personal optouts
+ok 48 - restart, retention and gateway recovery preserve bounded idle-wait and personal optouts
+  ---
+  duration_ms: 66.431617
+  type: 'test'
+  ...
+# Subtest: pending Start is fenced synchronously by later stop behind a queue barrier
+ok 49 - pending Start is fenced synchronously by later stop behind a queue barrier
+  ---
+  duration_ms: 32.646821
+  type: 'test'
+  ...
+# Subtest: pending Start is fenced synchronously by later end behind a queue barrier
+ok 50 - pending Start is fenced synchronously by later end behind a queue barrier
+  ---
+  duration_ms: 31.828017
+  type: 'test'
+  ...
+# Subtest: pending Start is fenced synchronously by later unknown behind a queue barrier
+ok 51 - pending Start is fenced synchronously by later unknown behind a queue barrier
+  ---
+  duration_ms: 29.428106
+  type: 'test'
+  ...
+# Subtest: pending Start is fenced synchronously by later safety behind a queue barrier
+ok 52 - pending Start is fenced synchronously by later safety behind a queue barrier
+  ---
+  duration_ms: 32.986868
+  type: 'test'
+  ...
+# Subtest: Start slow voice ready cannot subscribe after stop
+ok 53 - Start slow voice ready cannot subscribe after stop
+  ---
+  duration_ms: 49.594699
+  type: 'test'
+  ...
+# Subtest: Start slow voice ready cannot subscribe after end
+ok 54 - Start slow voice ready cannot subscribe after end
+  ---
+  duration_ms: 60.343777
+  type: 'test'
+  ...
+# Subtest: Start slow voice ready cannot subscribe after unknown
+ok 55 - Start slow voice ready cannot subscribe after unknown
+  ---
+  duration_ms: 68.16806
+  type: 'test'
+  ...
+# Subtest: Start slow voice ready cannot subscribe after safety
+ok 56 - Start slow voice ready cannot subscribe after safety
+  ---
+  duration_ms: 70.584679
+  type: 'test'
+  ...
+# Subtest: older coalesced empty cannot erase newer idle end hold or capture even briefly
+ok 57 - older coalesced empty cannot erase newer idle end hold or capture even briefly
+  ---
+  duration_ms: 69.506747
+  type: 'test'
+  ...
+# Subtest: older coalesced empty cannot erase newer idle safety hold or capture even briefly
+ok 58 - older coalesced empty cannot erase newer idle safety hold or capture even briefly
+  ---
+  duration_ms: 63.0359
+  type: 'test'
+  ...
+# Subtest: separate monotonic clock enforces inactivity deadline despite wall rollback and final payload stays publishable
+ok 59 - separate monotonic clock enforces inactivity deadline despite wall rollback and final payload stays publishable
+  ---
+  duration_ms: 55.504412
+  type: 'test'
+  ...
+# Subtest: separate monotonic clock enforces known_empty deadline despite wall rollback and final payload stays publishable
+ok 60 - separate monotonic clock enforces known_empty deadline despite wall rollback and final payload stays publishable
+  ---
+  duration_ms: 32.884158
+  type: 'test'
+  ...
+# Subtest: rollback after accepted PCM cannot seal an inactivity result before its wall start
+ok 61 - rollback after accepted PCM cannot seal an inactivity result before its wall start
+  ---
+  duration_ms: 45.447554
+  type: 'test'
+  ...
+# Subtest: rollback End timestamp stays frozen and publishable across its queued lifecycle barrier
+ok 62 - rollback End timestamp stays frozen and publishable across its queued lifecycle barrier
+  ---
+  duration_ms: 29.099393
+  type: 'test'
+  ...
+# Subtest: production elapsed clock is monotonic by default; injected wall clock compatibility is explicit
+ok 63 - production elapsed clock is monotonic by default; injected wall clock compatibility is explicit
+  ---
+  duration_ms: 2.289701
+  type: 'test'
+  ...
+# Subtest: a newer known-empty observation after queued idle end resets its hold normally
+ok 64 - a newer known-empty observation after queued idle end resets its hold normally
+  ---
+  duration_ms: 67.231921
+  type: 'test'
+  ...
+# Subtest: a newer known-empty observation after queued idle safety resets its hold normally
+ok 65 - a newer known-empty observation after queued idle safety resets its hold normally
+  ---
+  duration_ms: 63.589366
+  type: 'test'
+  ...
+# Subtest: idle control commit failure closes acceptance, persists fallback hold and never auto-retries
+ok 66 - idle control commit failure closes acceptance, persists fallback hold and never auto-retries
+  ---
+  duration_ms: 31.456345
+  type: 'test'
+  ...
+# Subtest: crash inside wake control commit restores idle-wait before retention deletes session intent
+ok 67 - crash inside wake control commit restores idle-wait before retention deletes session intent
+  ---
+  duration_ms: 19.216788
+  type: 'test'
+  ...
+# Subtest: durable idle control rejects malformed booleans and preserves independent hold and optouts
+ok 68 - durable idle control rejects malformed booleans and preserves independent hold and optouts
+  ---
+  duration_ms: 14.386299
+  type: 'test'
+  ...
+# Subtest: Start rejects outsider, stale/old notices, current capture, unknown and safety/max-duration holds
+ok 69 - Start rejects outsider, stale/old notices, current capture, unknown and safety/max-duration holds
+  ---
+  duration_ms: 95.810764
+  type: 'test'
+  ...
+# Subtest: bounded coalescing retains a fresh arrival, but newer unknown cancels it without occupied retry loop
+ok 70 - bounded coalescing retains a fresh arrival, but newer unknown cancels it without occupied retry loop
+  ---
+  duration_ms: 77.33303
+  type: 'test'
+  ...
+# Subtest: closed-notice personal Stop is durable even when current occupancy is unknown
+ok 71 - closed-notice personal Stop is durable even when current occupancy is unknown
+  ---
+  duration_ms: 76.469351
+  type: 'test'
+  ...
+# Subtest: a cancelled wake followed by known empty does not leave a permanent interrupted-wake tombstone
+ok 72 - a cancelled wake followed by known empty does not leave a permanent interrupted-wake tombstone
+  ---
+  duration_ms: 97.720752
+  type: 'test'
+  ...
+# Subtest: interrupted idle-stop intent recovers as incomplete inactivity, never an occupied startup wake
+ok 73 - interrupted idle-stop intent recovers as incomplete inactivity, never an occupied startup wake
+  ---
+  duration_ms: 22.397626
+  type: 'test'
+  ...
+# Subtest: wake transaction fails closed on interrupted control commit
+ok 74 - wake transaction fails closed on interrupted control commit
+  ---
+  duration_ms: 53.197336
+  type: 'test'
+  ...
+# Subtest: wake transaction fails closed on interrupted session commit
+ok 75 - wake transaction fails closed on interrupted session commit
+  ---
+  duration_ms: 46.127398
+  type: 'test'
+  ...
+1..75
+# tests 75
+# suites 0
+# pass 75
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2477.671854

@@ -144,7 +144,8 @@ test('notice consent, privacy, no-auto-resume and static controls; close is idem
   const notice = await pub.notice('session-a'); assert.equal(notice.state, 'sent');
   assert.match(port.lastPayload.content, /Joining alone is NOT consent/); assert.match(port.lastPayload.content, /Rejoining requires fresh consent/);
   assert.match(port.lastPayload.content, /shared microphone/); assert.match(port.lastPayload.content, /24 hours/);
-  assert.equal(port.lastPayload.components[0].components.length, 3);
+  assert.equal(port.lastPayload.components[0].components.length, 4);
+  assert.equal(port.lastPayload.components[0].components.at(-1).disabled, true);
   assert.ok(port.lastPayload.content.length <= 2000);
   assert.match(port.lastPayload.content, /Presence\/duration metadata is tracked for all participants/);
   await pub.notice('session-a'); assert.equal(port.sends, 1);
@@ -163,6 +164,7 @@ test('channel notice is automatic with one person and policy-correct static Resu
   assert.doesNotMatch(payload.content, /Joining alone is NOT consent|clicks \*\*I consent|Rejoining requires fresh consent/);
   assert.deepEqual(payload.components[0].components.map(b => [b.custom_id, b.label]), [
     ['local_transcription_consent', 'Resume my microphone'], ['local_transcription_revoke', 'Stop my microphone'], ['local_transcription_end', 'End recording'],
+    ['local_transcription_start', 'Start recording again'],
   ]);
   await pub.closeNotice(s.id);
   const closed = port.edits.at(-1).payload;

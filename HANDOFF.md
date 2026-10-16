@@ -2,6 +2,19 @@
 
 ## Start here
 
+**Idle-disconnect extension (2026-10-16):** The user approved **15s known-empty**
+shutdown, **300s no-audio** shutdown, fresh arrival/leave-rejoin wake and a guarded
+**Start recording again** fallback. Implementation passed **282/282 native ARM64
+tests** plus public recognition/helper and cross-container lock checks; upgrade
+administration passed **75 fake tests**. Review found and fixed older-empty versus
+newer End/safety ordering, superseded arrival evidence and wall-clock deadline
+issues, with failing-before/passing-after regressions. See
+`docs/IDLE_DISCONNECT_{CONTRACT,RESULTS}.md`. Source integration does not by itself
+mean this update is deployed; the live deployment record below is authoritative.
+Attachments remain unapproved/off and long multi-speaker target capacity is still
+unverified. The upgrade reuses the existing private meeting volume; original exact
+rollback and one-shot marker remain preserved.
+
 **Live deployment update (2026-10-16):** The user authorized activation. Oracle now
 runs the published `transcription-ea7ebe62ee5c8ba400599ac0888976809dc48b4f` image
 with the feature enabled and `CONSENT_MODE=channel`, a separate durable volume and

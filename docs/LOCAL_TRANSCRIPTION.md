@@ -92,8 +92,11 @@ not bolt a second publisher onto the old grace callback.
 4. One global native recognition slot covers every speaker AND old/new sessions.
    ffmpeg properly resamples stereo48kHz/s16le PCM to mono16kHz WAV. CPU whisper.cpp
    recognizes English using four threads, with private bounded output.
-5. A continuously **known empty** room closes after the configured grace. One
-   remaining human does not end the call. Unknown occupancy never means empty.
+5. A continuously **known empty** room closes after the configured grace
+   (default **15 seconds**). A known occupied session also closes after **five
+   minutes without accepted authorized nonzero audio**. Noise can count as audio;
+   this is not semantic speech detection. Unknown occupancy is neither empty nor
+   a successful inactivity-completion trigger.
 6. End freezes the old session, drains capture EOF and accounts for all accepted
    jobs. A new session can capture while an old one recognizes/publishes, without
    sharing participant or transcript buffers.
@@ -121,6 +124,24 @@ owned late-publication continuations before releasing the writer lock. A real ke
 one writer across processes/containers sharing the data volume; PID guesses are
 not used as a substitute. Use a local filesystem with verified fsync/rename/flock
 semantics, not an unvalidated network filesystem.
+
+## Inactivity disconnect and restart
+
+The inactivity timeout is administrator-configurable through
+`LOCAL_TRANSCRIPTION_IDLE_SECONDS` (default300). Disconnect stops capture but does
+not skip queued recognition or the final accounting barrier. Durable idle-wait
+prevents repeatedly rejoining an unchanged occupied room, including across restart
+and gateway recovery. A fresh authenticated voice arrival—including someone
+leaving/rejoining while others remain—can start a new meeting under channel policy.
+The **Start recording again** button on the latest eligible closed notice is the
+fallback. Manual policy still requires fresh microphone consent. Neither path
+clears personal pauses or deliberate End/safety/duration holds. A trustworthy known
+empty channel releases the applicable holds under the existing policy. Old or
+outsider controls cannot authorize a new recording.
+
+The two new elapsed deadlines use a monotonic clock; wall timestamps remain for
+metadata/display. See `IDLE_DISCONNECT_CONTRACT.md` and `IDLE_DISCONNECT_RESULTS.md`
+for ordering, recovery, source/native evidence and remaining clock limitations.
 
 ## Publication and recovery limits
 
@@ -155,7 +176,8 @@ LOCAL_TRANSCRIPTION_ENABLED=false
 LOCAL_TRANSCRIPTION_CONSENT_MODE=manual
 LOCAL_TRANSCRIPT_ATTACHMENTS=false
 LOCAL_TRANSCRIPTION_DATA_DIR=/data/transcription
-LOCAL_TRANSCRIPTION_EMPTY_GRACE_SECONDS=90
+LOCAL_TRANSCRIPTION_EMPTY_GRACE_SECONDS=15
+LOCAL_TRANSCRIPTION_IDLE_SECONDS=300
 LOCAL_TRANSCRIPTION_MAX_SESSION_SECONDS=14400
 LOCAL_TRANSCRIPTION_MAX_DRAIN_SECONDS=300
 ```

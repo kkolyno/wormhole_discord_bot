@@ -86,7 +86,7 @@ test('shutdown during startup cannot create a store/coordinator after releasing 
 });
 test('only exact current bot-authored notice and present human may use static IDs', async t => {
   const h = harness(t); await h.feature.onStartup(h.client);
-  assert.deepEqual(Object.keys(h.feature.buttonHandlers).sort(), ['local_transcription_consent', 'local_transcription_end', 'local_transcription_revoke']);
+  assert.deepEqual(Object.keys(h.feature.buttonHandlers).sort(), ['local_transcription_consent', 'local_transcription_end', 'local_transcription_revoke', 'local_transcription_start']);
   const handler = h.feature.buttonHandlers.local_transcription_consent;
   for (const extra of [{ guildId: '999999999999999999' }, { channelId: ids.voice }, { user: { id: ids.human, bot: true } },
     { message: { id: '777777777777777777', author: { id: ids.bot } } }, { message: { id: ids.notice, author: { id: ids.human } } }]) await handler(h.interaction(extra));
