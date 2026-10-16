@@ -16,8 +16,18 @@ The later authorized one-shot Oracle test, immutable test image and exact rollba
 are recorded in [`docs/ORACLE_LIVE_TEST.md`](docs/ORACLE_LIVE_TEST.md). That deployment
 supersedes the historical running-image table below.
 
-A durable meeting-transcription mode is now implemented on the feature branch,
-**off by default and not published/deployed**. Read
+**2026-10-16 live update:** The durable meeting image at `ea7ebe62` has now been
+published and activated with `LOCAL_TRANSCRIPTION_ENABLED=true` and
+`LOCAL_TRANSCRIPTION_CONSENT_MODE=channel`. See
+[`docs/ORACLE_MEETING_DEPLOYMENT.md`](docs/ORACLE_MEETING_DEPLOYMENT.md) and
+[`scripts/ORACLE-MEETING-OPERATIONS.md`](scripts/ORACLE-MEETING-OPERATIONS.md) for
+current artifact, verification limits and exact-original rollback. Configured
+location remains **Wormhole / water-cooler**; Discord login was verified, but
+voice join/capture has not yet been verified. Attachments remain unapproved/off.
+
+The following paragraph records the **earlier source-only implementation phase**.
+A durable meeting-transcription mode was implemented on the feature branch,
+**off by default and not yet published/deployed at that time**. Read
 [`docs/LOCAL_TRANSCRIPTION.md`](docs/LOCAL_TRANSCRIPTION.md) and
 [`docs/LOCAL_TRANSCRIPTION_RESULTS.md`](docs/LOCAL_TRANSCRIPTION_RESULTS.md) before
 any activation. The user clarified that all employees in the private company

@@ -2,6 +2,18 @@
 
 ## Start here
 
+**Live deployment update (2026-10-16):** The user authorized activation. Oracle now
+runs the published `transcription-ea7ebe62ee5c8ba400599ac0888976809dc48b4f` image
+with the feature enabled and `CONSENT_MODE=channel`, a separate durable volume and
+45-second stop grace. Discord login and private UID1001 storage/kernel lock were
+verified; **voice join/capture was not yet verified**. The configured location is
+**Wormhole / water-cooler**, and the user reports being in the “meeting room”:
+confirm the location rather than silently changing recording scope. Long transcript
+attachments remain unapproved/off; sustained one-to-two-hour multi-speaker capacity
+is unverified. Read `docs/ORACLE_MEETING_DEPLOYMENT.md` and the new
+`scripts/ORACLE-MEETING-OPERATIONS.md` for current image, private journal and exact
+original rollback. Later not-deployed statements below describe earlier phases.
+
 **Latest user clarification — company standing consent:** This is a private company
 channel and all employees have consented. The requested behavior is automatic
 recording/transcription with even one human present, including solo brain dumps,
@@ -32,7 +44,7 @@ design or treat its model choices, performance estimates, snippets, or guarantee
 as evidence. This file is the requirements/context handoff, not a validated
 implementation design.
 
-**Current status (2026-10-15, after microphone feedback):** The user reported the
+**Historical status (2026-10-15, after microphone feedback):** The user reported the
 actual microphone transcript looked very good and basically realtime, then asked
 us to continue. A durable, explicitly consented meeting-transcription feature is
 now implemented behind `LOCAL_TRANSCRIPTION_ENABLED=true`, **not published or

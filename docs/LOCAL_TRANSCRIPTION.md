@@ -9,7 +9,10 @@ base.en is the first integration baseline because it has now processed real Disc
 speech usefully on target. No NPU or external speech-recognition service is needed.
 This does not establish sustained or multiple-speaker throughput.
 
-**The new meeting mode is OFF by default and is not yet deployed to Oracle.**
+**The meeting mode remains OFF by default in source/images. On 2026-10-16 the
+operator explicitly enabled channel policy on Oracle.** See
+[the live deployment record](ORACLE_MEETING_DEPLOYMENT.md) for the exact artifact,
+current verification limits and new bounded rollback procedure.
 The unchanged legacy meetings feature remains the default; the two modes are
 mutually exclusive. `main` and the exact original rollback image remain preserved.
 The earlier one-shot image resumes legacy handling after its test and does not
@@ -190,9 +193,10 @@ SHA. The loaded image must pass offline native preflight and fixed-hash public
 English inference before push; the same tested bytes are pushed without rebuild.
 Publishing/deploying is an operator step after review, not done by workers.
 
-A future Oracle activation needs a separately reviewed override: the immutable new
-image, explicit enable/attachment policy, dedicated durable volume, and adequate
-stop grace (at least35s). The existing one-shot administration helper intentionally
+The 2026-10-16 Oracle activation used a separately reviewed override: the immutable
+new image, explicit enable/channel/attachment policy, dedicated durable volume,
+and 45-second stop grace. See `ORACLE_MEETING_DEPLOYMENT.md` and
+`../scripts/ORACLE-MEETING-OPERATIONS.md` for the current procedure. The existing one-shot administration helper intentionally
 does not accept this new mode; do not loosen its allowlist or reuse its cached
 activation job as if it were a new deployment.
 
