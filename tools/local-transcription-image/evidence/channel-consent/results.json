@@ -1,0 +1,27 @@
+{
+  "scope": "disposable ARM64 development VM, not RK3588",
+  "imageId": "sha256:95ec8530411a46da786ffa2e14d7f6511f0759b03dd170c25ade012e23ded72a",
+  "tag": "local-transcription-dev:channel-20261016",
+  "runtimeNode": "22.22.0",
+  "nativeTests": {
+    "tests": 209,
+    "pass": 209,
+    "fail": 0,
+    "skip": 0
+  },
+  "outerWorkerTests": {
+    "node": "24.18.0",
+    "tests": 209,
+    "pass": 208,
+    "fail": 0,
+    "skip": 1,
+    "skipReason": "real ffmpeg unavailable in outer worker"
+  },
+  "imageAndWorkflowContracts": 5,
+  "networkDisabledPublicEnglishInference": true,
+  "actualRecognizerPublicFixtureHelper": true,
+  "crossContainerLockExclusion": true,
+  "imageSourceInputsVerified": 51,
+  "publicationOrDeployment": false,
+  "productionCredentialsOrPrivateAudioUsed": false
+}

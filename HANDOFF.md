@@ -2,6 +2,30 @@
 
 ## Start here
 
+**Latest user clarification — company standing consent:** This is a private company
+channel and all employees have consented. The requested behavior is automatic
+recording/transcription with even one human present, including solo brain dumps,
+with an administrator-modifiable setting. The new extension is
+`LOCAL_TRANSCRIPTION_CONSENT_MODE=manual|channel` (default manual). Channel mode
+uses that standing consent instead of per-meeting clicks, including normal
+restart/gateway recovery; it must preserve deliberate personal Stop/End and
+safety holds. See `docs/STANDING_CONSENT_CONTRACT.md`. This explicitly supersedes
+the earlier click-only assumptions for the opt-in channel policy, not the one-shot
+marker or unrelated production permissions. Attachments are still unapproved/off.
+No automatic mode has been deployed by this development phase. The extension is
+implemented; final native ARM64 Node22 verification passed **209/209 tests**,
+public inference and cross-container lock checks. Read
+`docs/STANDING_CONSENT_RESULTS.md` for new evidence; the older 159-test image is
+a historical manual-policy baseline. For the intended company deployment use
+`LOCAL_TRANSCRIPTION_ENABLED=true` plus
+`LOCAL_TRANSCRIPTION_CONSENT_MODE=channel`; changing it requires restart/recreate,
+not another employee consent click. Extension worker `sb_8ff8b2b1` has been
+stopped/deleted and verified absent through API/Docker; no vault, orchestrator,
+production credentials or private speech were used. Dependencies and the owned
+image tag were removed, retaining approximately 2.0 MiB of source/docs/evidence
+at `~/Documents/GitHub/_agent-sandbox/wormhole-standing-consent`. Source changes
+stay on the feature branch; the user's `.mcp.json` remains untracked/preserved.
+
 The user rejected the previous local model's transcription plan and requested a
 clean restart. That plan has been deleted. Do not reconstruct it as an approved
 design or treat its model choices, performance estimates, snippets, or guarantees

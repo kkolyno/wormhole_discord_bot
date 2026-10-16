@@ -151,6 +151,66 @@ test('notice consent, privacy, no-auto-resume and static controls; close is idem
   await pub.closeNotice('session-a'); await pub.closeNotice('session-a'); assert.equal(port.edits.length, 1);
   assert.ok(port.edits[0].payload.components[0].components.every(b => b.disabled));
 });
+test('channel notice is automatic with one person and policy-correct static Resume/Stop/End controls', async () => {
+  const s = { ...session(), consentMode: 'channel', phase: 'active', endedAt: null };
+  const store = new MemoryStore(s, []), port = transport(), pub = new Publisher({ store, transport: port });
+  await pub.notice(s.id);
+  const payload = port.lastPayload;
+  assert.ok(payload.content.length <= 2000, payload.content.length);
+  for (const text of ['standing company consent', 'including guests', 'shared microphones', 'automatically with one person',
+    'no button or notice acknowledgement is required', 'startup/restart', 'gateway reconnect', 'at most 4 hours',
+    'across leave/rejoin and restart', 'known empty', '24 hours', 'pause account IDs persist']) assert.ok(payload.content.includes(text), text);
+  assert.doesNotMatch(payload.content, /Joining alone is NOT consent|clicks \*\*I consent|Rejoining requires fresh consent/);
+  assert.deepEqual(payload.components[0].components.map(b => [b.custom_id, b.label]), [
+    ['local_transcription_consent', 'Resume my microphone'], ['local_transcription_revoke', 'Stop my microphone'], ['local_transcription_end', 'End recording'],
+  ]);
+  await pub.closeNotice(s.id);
+  const closed = port.edits.at(-1).payload;
+  assert.match(closed.content, /Fixed channel policy/);
+  assert.match(closed.content, /never through personal pauses, End or safety holds/);
+  assert.doesNotMatch(closed.content, /new session needs fresh consent/);
+  assert.equal(closed.components[0].components[0].label, 'Resume my microphone');
+  assert.ok(closed.components[0].components.every(b => b.disabled));
+});
+test('legacy missing policy and explicit manual use identical manual notices, finals and closed labels', async () => {
+  const legacy = new MemoryStore(), manual = new MemoryStore({ ...session(), consentMode: 'manual' });
+  assert.deepEqual(finalPayload(legacy.s, legacy.jobs), finalPayload(manual.s, manual.jobs));
+  const payloads = [], closures = [];
+  for (const store of [legacy, manual]) {
+    store.s.phase = 'active'; const port = transport(), pub = new Publisher({ store, transport: port });
+    await pub.notice(store.s.id); payloads.push(port.lastPayload);
+    await pub.closeNotice(store.s.id); closures.push(port.edits[0].payload);
+  }
+  assert.deepEqual(payloads[0], payloads[1]); assert.deepEqual(closures[0], closures[1]);
+  assert.equal(payloads[0].components[0].components[0].label, 'I consent: record my mic');
+  assert.match(closures[0].content, /new session needs fresh consent/);
+});
+test('channel final attributes authorization to persisted company policy, not meeting button clicks', async () => {
+  const store = new MemoryStore({ ...session(), consentMode: 'channel' }), port = transport();
+  await new Publisher({ store, transport: port }).publish(store.s.id);
+  assert.match(port.lastPayload.content, /authorized at least once under administrator-confirmed company standing consent \(channel policy\)/);
+  assert.match(port.lastPayload.content, /no per-meeting click is required/);
+  assert.doesNotMatch(port.lastPayload.content, /account\(s\) consented at least once|clicked|I consent/);
+  assert.ok(port.lastPayload.content.length <= 2000);
+  store.s.participants[USER].everConsented = false;
+  assert.match(finalPayload(store.s, []).content, /no participants authorized/);
+});
+test('publisher rejects invalid persisted policy before sending any notice or final', async () => {
+  for (const value of ['', 'CHANNEL', null, true]) {
+    const store = new MemoryStore({ ...session(), consentMode: value }), port = transport(), pub = new Publisher({ store, transport: port });
+    await assert.rejects(pub.notice(store.s.id), /INVALID_CONSENT_MODE/);
+    await assert.rejects(pub.publish(store.s.id), /INVALID_CONSENT_MODE/);
+    assert.equal(port.sends, 0);
+  }
+});
+test('channel notice uncertainty preserves its persisted policy and reconciles without another send', async () => {
+  const store = new MemoryStore({ ...session(), consentMode: 'channel', phase: 'active', endedAt: null }), port = transport(), original = port.send;
+  port.send = async function (payload) { await original.call(this, payload); throw Error('lost ack'); };
+  const pub = new Publisher({ store, transport: port });
+  assert.equal((await pub.notice(store.s.id)).state, 'uncertain');
+  assert.equal((await new Publisher({ store, transport: port }).notice(store.s.id)).state, 'sent');
+  assert.equal(port.sends, 1); assert.match(port.lastPayload.content, /automatic company consent/);
+});
 test('notice send ambiguity is reconciled without creating a second consent prompt', async () => {
   const s = { ...session(), phase: 'active', endedAt: null }, store = new MemoryStore(s, []), port = transport(), original = port.send;
   port.send = async function (payload) { await original.call(this, payload); throw Error('lost ack'); };

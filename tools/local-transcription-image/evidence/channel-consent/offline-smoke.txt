@@ -1,0 +1,1385 @@
+
+== Runtime and inherited native build evidence ==
+v22.22.0
+10.9.4
+Linux 7.0.14-orbstack-00380-ga7e0a2dc9535 aarch64
+3.23.3
+gcc (Alpine 15.2.0) 15.2.0
+Copyright (C) 2025 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+g++ (Alpine 15.2.0) 15.2.0
+Copyright (C) 2025 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+cmake version 4.1.3
+
+CMake suite maintained and supported by Kitware (kitware.com/cmake).
+3.23.3
+flock from util-linux 2.41.6
+ffmpeg version 8.0.1 Copyright (c) 2000-2025 the FFmpeg developers
+built with gcc 15.2.0 (Alpine 15.2.0)
+configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharfbuzz --enable-libjxl --enable-libmp3lame --enable-libopenmpt --enable-libopus --enable-libplacebo --enable-libpulse --enable-librav1e --enable-librist --enable-libshaderc --enable-libsoxr --enable-libsrt --enable-libssh --enable-libtheora --enable-libv4l2 --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxcb --enable-libxml2 --enable-libxvid --enable-libzimg --enable-libzmq --enable-lto=auto --enable-lv2 --enable-openssl --enable-pic --enable-pthreads --enable-shared --enable-vaapi --enable-vdpau --enable-version3 --enable-vulkan --optflags=-O3 --enable-libsvtav1
+libavutil      60.  8.100 / 60.  8.100
+libavcodec     62. 11.100 / 62. 11.100
+libavformat    62.  3.100 / 62.  3.100
+libavdevice    62.  1.100 / 62.  1.100
+libavfilter    11.  4.100 / 11.  4.100
+libswscale      9.  1.100 /  9.  1.100
+libswresample   6.  1.100 /  6.  1.100
+
+Exiting with exit code 0
+	/lib/ld-musl-aarch64.so.1 (0xffff9b330000)
+	libwhisper.so.1 => /usr/local/lib/libwhisper.so.1 (0xffff9b1bd000)
+	libggml.so.0 => /usr/local/lib/libggml.so.0 (0xffff9b19c000)
+	libstdc++.so.6 => /usr/lib/libstdc++.so.6 (0xffff9aed7000)
+	libgcc_s.so.1 => /usr/lib/libgcc_s.so.1 (0xffff9aea6000)
+	libc.musl-aarch64.so.1 => /lib/ld-musl-aarch64.so.1 (0xffff9b330000)
+	libggml-base.so.0 => /usr/local/lib/libggml-base.so.0 (0xffff9add5000)
+	libggml-cpu.so.0 => /usr/local/lib/libggml-cpu.so.0 (0xffff9ac64000)
+/opt/models/ggml-base.en.bin: OK
+
+== Exact dependency versions and offline native codec load ==
+wormhole-discord-bot@2.0.0 /app
++-- @discordjs/voice@0.19.2
++-- @snazzah/davey@0.1.12
++-- discord.js@14.27.0
++-- dotenv@17.2.3
+`-- opusscript@0.0.8
+
+PASS: DAVE native load and Opus synthetic roundtrip (not real DAVE receive proof)
+
+== Fake/synthetic unit contracts, real OS lock, bounded shutdown ==
+TAP version 13
+# Subtest: no subscription before explicit consent; ready handshake primes only owner; independent per-speaker state, no PCM retained
+ok 1 - no subscription before explicit consent; ready handshake primes only owner; independent per-speaker state, no PCM retained
+  ---
+  duration_ms: 8.030854
+  type: 'test'
+  ...
+# Subtest: revocation is synchronous, drops queued old tail; leave/rejoin requires new consent and fresh codec/stream
+ok 2 - revocation is synchronous, drops queued old tail; leave/rejoin requires new consent and fresh codec/stream
+  ---
+  duration_ms: 6.591577
+  type: 'test'
+  ...
+# Subtest: close drains last paused packet through base Readable EOF, disallows subscriptions and is idempotent
+ok 3 - close drains last paused packet through base Readable EOF, disallows subscriptions and is idempotent
+  ---
+  duration_ms: 1.080061
+  type: 'test'
+  ...
+# Subtest: fake routing detaches before EOF, keeps buffered tail and leaves unrelated streams routed
+ok 4 - fake routing detaches before EOF, keeps buffered tail and leaves unrelated streams routed
+  ---
+  duration_ms: 2.943511
+  type: 'test'
+  ...
+# Subtest: stale fake speaker never deletes a replacement routing entry or resumes revoked speech
+ok 5 - stale fake speaker never deletes a replacement routing entry or resumes revoked speech
+  ---
+  duration_ms: 1.927744
+  type: 'test'
+  ...
+# Subtest: a real leave event revokes an old closing runtime before its buffered tail decodes
+ok 6 - a real leave event revokes an old closing runtime before its buffered tail decodes
+  ---
+  duration_ms: 1.503485
+  type: 'test'
+  ...
+# Subtest: real pinned voice 0.19.2 AudioReceiveStream regression: buffered final words not destroyed by push(null)
+ok 7 - real pinned voice 0.19.2 AudioReceiveStream regression: buffered final words not destroyed by push(null)
+  ---
+  duration_ms: 31.934951
+  type: 'test'
+  ...
+# Subtest: real voice receiver detaches UDP routing before EOF and retains the last buffered frame
+ok 8 - real voice receiver detaches UDP routing before EOF and retains the last buffered frame
+  ---
+  duration_ms: 1.687405
+  type: 'test'
+  ...
+# Subtest: real UDP receiver missing or refusing its routing Map fails explicitly without resuming tail
+ok 9 - real UDP receiver missing or refusing its routing Map fails explicitly without resuming tail
+  ---
+  duration_ms: 1.537986
+  type: 'test'
+  ...
+# Subtest: real voice receiver resubscription waits old Map deletion; revoke racing EOF is intentional, not a fault
+ok 10 - real voice receiver resubscription waits old Map deletion; revoke racing EOF is intentional, not a fault
+  ---
+  duration_ms: 0.807973
+  type: 'test'
+  ...
+# Subtest: revocation during pending drain drops tail without reporting a false fault
+ok 11 - revocation during pending drain drops tail without reporting a false fault
+  ---
+  duration_ms: 0.416049
+  type: 'test'
+  ...
+# Subtest: retiring decoder/streams count toward memory cap during account churn
+ok 12 - retiring decoder/streams count toward memory cap during account churn
+  ---
+  duration_ms: 0.22442
+  type: 'test'
+  ...
+# Subtest: bounded speakers, packets, PCM and buffered queues fail closed with sanitized codes
+ok 13 - bounded speakers, packets, PCM and buffered queues fail closed with sanitized codes
+  ---
+  duration_ms: 9.427294
+  type: 'test'
+  ...
+# Subtest: real move, self/server deafen, reconnect/disconnect, receive/EOF faults are distinct from expected teardown
+ok 14 - real move, self/server deafen, reconnect/disconnect, receive/EOF faults are distinct from expected teardown
+  ---
+  duration_ms: 4.841296
+  type: 'test'
+  ...
+# Subtest: bounded drain failure cannot claim complete audio; callback/decode init failure sanitized
+ok 15 - bounded drain failure cannot claim complete audio; callback/decode init failure sanitized
+  ---
+  duration_ms: 11.578417
+  type: 'test'
+  ...
+# Subtest: failed ready handshake cleans listeners/connection and allows a later fresh open
+ok 16 - failed ready handshake cleans listeners/connection and allows a later fresh open
+  ---
+  duration_ms: 6.565327
+  type: 'test'
+  ...
+# Subtest: subscriber/callback failures sanitize and dispose partially initialized resources
+ok 17 - subscriber/callback failures sanitize and dispose partially initialized resources
+  ---
+  duration_ms: 0.783806
+  type: 'test'
+  ...
+# Subtest: actual WASM Opus decode handles variable bounded frame sizes without sharing codec state
+ok 18 - actual WASM Opus decode handles variable bounded frame sizes without sharing codec state
+  ---
+  duration_ms: 31.304397
+  type: 'test'
+  ...
+# Subtest: channel policy captures a lone brain dump before notice acknowledgement; canonical waits for end and jobs
+ok 19 - channel policy captures a lone brain dump before notice acknowledgement; canonical waits for end and jobs
+  ---
+  duration_ms: 30.157877
+  type: 'test'
+  ...
+# Subtest: channel policy never starts for a bots-only room
+ok 20 - channel policy never starts for a bots-only room
+  ---
+  duration_ms: 5.604977
+  type: 'test'
+  ...
+# Subtest: manual policy still never opens audio without a current participant click
+ok 21 - manual policy still never opens audio without a current participant click
+  ---
+  duration_ms: 6.965417
+  type: 'test'
+  ...
+# Subtest: trusted gateway recovery automatically opens a new channel-policy session without a click
+ok 22 - trusted gateway recovery automatically opens a new channel-policy session without a click
+  ---
+  duration_ms: 16.567715
+  type: 'test'
+  ...
+# Subtest: deliberate End survives occupied restart; known empty resets it and next lone join starts automatically
+ok 23 - deliberate End survives occupied restart; known empty resets it and next lone join starts automatically
+  ---
+  duration_ms: 11.875673
+  type: 'test'
+  ...
+# Subtest: personal Stop beats stalled acknowledgement and survives polling, nonempty rejoin and restart; Resume is deliberate
+ok 24 - personal Stop beats stalled acknowledgement and survives polling, nonempty rejoin and restart; Resume is deliberate
+  ---
+  duration_ms: 18.901383
+  type: 'test'
+  ...
+# Subtest: strict opt-in and attachment approval default off
+ok 25 - strict opt-in and attachment approval default off
+  ---
+  duration_ms: 0.905683
+  type: 'test'
+  ...
+# Subtest: consent policy is an exact enum, not a boolean or a trimmed string
+ok 26 - consent policy is an exact enum, not a boolean or a trimmed string
+  ---
+  duration_ms: 0.59151
+  type: 'test'
+  ...
+# Subtest: invalid IDs, relative root, malformed and excessive limits fail without echoing input
+ok 27 - invalid IDs, relative root, malformed and excessive limits fail without echoing input
+  ---
+  duration_ms: 0.247671
+  type: 'test'
+  ...
+# Subtest: timed-out late audio handshake closes without any subscription, accepted PCM, or revived session
+ok 28 - timed-out late audio handshake closes without any subscription, accepted PCM, or revived session
+  ---
+  duration_ms: 18.969217
+  type: 'test'
+  ...
+# Subtest: real fault during handshake clears acceptance and does not permit a later subscription before queued fault teardown
+ok 29 - real fault during handshake clears acceptance and does not permit a later subscription before queued fault teardown
+  ---
+  duration_ms: 4.368328
+  type: 'test'
+  ...
+# Subtest: unconfirmed capture EOF is explicitly incomplete, cannot authorize a second physical capture, and shutdown awaits actual close
+ok 30 - unconfirmed capture EOF is explicitly incomplete, cannot authorize a second physical capture, and shutdown awaits actual close
+  ---
+  duration_ms: 46.723425
+  type: 'test'
+  ...
+# Subtest: real close-time drain fault makes the old session incomplete without faulting a new session; intentional late teardown stays ignored
+ok 31 - real close-time drain fault makes the old session incomplete without faulting a new session; intentional late teardown stays ignored
+  ---
+  duration_ms: 4.793045
+  type: 'test'
+  ...
+# Subtest: durable metadata failure synchronously closes privacy gate and receiver even when lifecycle checkpoint cannot commit
+ok 32 - durable metadata failure synchronously closes privacy gate and receiver even when lifecycle checkpoint cannot commit
+  ---
+  duration_ms: 3.541189
+  type: 'test'
+  ...
+# Subtest: old job result-storage failure stops a separately capturing new session because the paused writer is global
+ok 33 - old job result-storage failure stops a separately capturing new session because the paused writer is global
+  ---
+  duration_ms: 4.47633
+  type: 'test'
+  ...
+# Subtest: per-user unsubscribe finishes before fresh resubscribe; invalidation epoch memory is participant-bounded
+ok 34 - per-user unsubscribe finishes before fresh resubscribe; invalidation epoch memory is participant-bounded
+  ---
+  duration_ms: 4.718752
+  type: 'test'
+  ...
+# Subtest: EOF spool rejection belongs to old draining runtime even when new current exists; equality is not completeness
+ok 35 - EOF spool rejection belongs to old draining runtime even when new current exists; equality is not completeness
+  ---
+  duration_ms: 26.912527
+  type: 'test'
+  ...
+# Subtest: any rejected bytes mark incomplete even with consistent accounting and no stored reason
+ok 36 - any rejected bytes mark incomplete even with consistent accounting and no stored reason
+  ---
+  duration_ms: 1.877201
+  type: 'test'
+  ...
+# Subtest: leave reaches old closing gates with new current; participant-bounded epochs are removed after physical close
+ok 37 - leave reaches old closing gates with new current; participant-bounded epochs are removed after physical close
+  ---
+  duration_ms: 5.415473
+  type: 'test'
+  ...
+# Subtest: closed old notice revoke removes only old closing gate, never new runtime epochs
+ok 38 - closed old notice revoke removes only old closing gate, never new runtime epochs
+  ---
+  duration_ms: 5.642935
+  type: 'test'
+  ...
+# Subtest: current-notice Stop cuts off an older physical capture runtime as well as current gates
+ok 39 - current-notice Stop cuts off an older physical capture runtime as well as current gates
+  ---
+  duration_ms: 7.932893
+  type: 'test'
+  ...
+# Subtest: Resume queued for an observed but unaccounted member cannot erase their later durable Stop
+ok 40 - Resume queued for an observed but unaccounted member cannot erase their later durable Stop
+  ---
+  duration_ms: 1.947826
+  type: 'test'
+  ...
+# Subtest: end validates exact notice then seals acceptance synchronously ahead of queue and freezes stop-time accounting
+ok 41 - end validates exact notice then seals acceptance synchronously ahead of queue and freezes stop-time accounting
+  ---
+  duration_ms: 5.585684
+  type: 'test'
+  ...
+# Subtest: end while voice readiness is pending invalidates consent and never subscribes or revives late handle
+ok 42 - end while voice readiness is pending invalidates consent and never subscribes or revives late handle
+  ---
+  duration_ms: 5.482265
+  type: 'test'
+  ...
+# Subtest: known-empty grace freezes true end/durations while new session begins before old recognition finishes
+ok 43 - known-empty grace freezes true end/durations while new session begins before old recognition finishes
+  ---
+  duration_ms: 4.789712
+  type: 'test'
+  ...
+# Subtest: safety hold survives session pruning/restart; unknown/nonempty cannot clear it but known-empty can
+ok 44 - safety hold survives session pruning/restart; unknown/nonempty cannot clear it but known-empty can
+  ---
+  duration_ms: 4.257285
+  type: 'test'
+  ...
+# Subtest: startup expires abandoned speech before native work, old notice closure, or publication
+ok 45 - startup expires abandoned speech before native work, old notice closure, or publication
+  ---
+  duration_ms: 10.453939
+  type: 'test'
+  ...
+# Subtest: constructor defaults manual and strictly validates the fixed policy
+ok 46 - constructor defaults manual and strictly validates the fixed policy
+  ---
+  duration_ms: 9.874636
+  type: 'test'
+  ...
+# Subtest: channel lone occupant starts before notice HTTP resolves; failed/uncertain notice cannot gate automatic capture
+ok 47 - channel lone occupant starts before notice HTTP resolves; failed/uncertain notice cannot gate automatic capture
+  ---
+  duration_ms: 10.535898
+  type: 'test'
+  ...
+# Subtest: known humans join/rejoin automatically, bots do not; unknown synchronously cuts off and known occupancy restores grants
+ok 48 - known humans join/rejoin automatically, bots do not; unknown synchronously cuts off and known occupancy restores grants
+  ---
+  duration_ms: 3.462895
+  type: 'test'
+  ...
+# Subtest: Stop is synchronous and durable ahead of lifecycle/HTTP; polling, other joins, unknown and rejoin preserve it
+ok 49 - Stop is synchronous and durable ahead of lifecycle/HTTP; polling, other joins, unknown and rejoin preserve it
+  ---
+  duration_ms: 11.250077
+  type: 'test'
+  ...
+# Subtest: older queued empty snapshot cannot erase a newer Stop
+ok 50 - older queued empty snapshot cannot erase a newer Stop
+  ---
+  duration_ms: 5.331846
+  type: 'test'
+  ...
+# Subtest: normal restart creates a new automatic session but optouts and explicit End survive restart and pruning
+ok 51 - normal restart creates a new automatic session but optouts and explicit End survive restart and pruning
+  ---
+  duration_ms: 8.657573
+  type: 'test'
+  ...
+# Subtest: automatic readiness rechecks revoke privacy barrier and does not subscribe late
+ok 52 - automatic readiness rechecks revoke privacy barrier and does not subscribe late
+  ---
+  duration_ms: 1.3824
+  type: 'test'
+  ...
+# Subtest: automatic readiness rechecks leave privacy barrier and does not subscribe late
+ok 53 - automatic readiness rechecks leave privacy barrier and does not subscribe late
+  ---
+  duration_ms: 10.153058
+  type: 'test'
+  ...
+# Subtest: automatic readiness rechecks end privacy barrier and does not subscribe late
+ok 54 - automatic readiness rechecks end privacy barrier and does not subscribe late
+  ---
+  duration_ms: 1.036227
+  type: 'test'
+  ...
+# Subtest: automatic readiness rechecks unknown privacy barrier and does not subscribe late
+ok 55 - automatic readiness rechecks unknown privacy barrier and does not subscribe late
+  ---
+  duration_ms: 1.384775
+  type: 'test'
+  ...
+# Subtest: every automatic account epoch is captured before first account readiness await
+ok 56 - every automatic account epoch is captured before first account readiness await
+  ---
+  duration_ms: 7.704848
+  type: 'test'
+  ...
+# Subtest: stale explicit Resume cannot erase later Stop or a leave/rejoin epoch during pending readiness
+ok 57 - stale explicit Resume cannot erase later Stop or a leave/rejoin epoch during pending readiness
+  ---
+  duration_ms: 6.941833
+  type: 'test'
+  ...
+# Subtest: Stop during asynchronous subscribe defeats Resume after its durable clear
+ok 58 - Stop during asynchronous subscribe defeats Resume after its durable clear
+  ---
+  duration_ms: 1.807783
+  type: 'test'
+  ...
+# Subtest: automatic over-cap snapshot fails visibly closed rather than recording only its first eligible accounts
+ok 59 - automatic over-cap snapshot fails visibly closed rather than recording only its first eligible accounts
+  ---
+  duration_ms: 10.328103
+  type: 'test'
+  ...
+# Subtest: only allowlisted gateway stops recover under known channel occupancy; all native/safety stops stay held
+ok 60 - only allowlisted gateway stops recover under known channel occupancy; all native/safety stops stay held
+  ---
+  duration_ms: 10.178184
+  type: 'test'
+  ...
+# Subtest: configured duration remains a safety hold in channel mode, not an automatic retry
+ok 61 - configured duration remains a safety hold in channel mode, not an automatic retry
+  ---
+  duration_ms: 1.565153
+  type: 'test'
+  ...
+# Subtest: automatic jobs recognize during the call and canonical publication waits for terminal work and capture EOF
+ok 62 - automatic jobs recognize during the call and canonical publication waits for terminal work and capture EOF
+  ---
+  duration_ms: 2.948511
+  type: 'test'
+  ...
+# Subtest: pending snapshot coalescing is bounded and preserves unknown/known-empty privacy barriers
+ok 63 - pending snapshot coalescing is bounded and preserves unknown/known-empty privacy barriers
+  ---
+  duration_ms: 6.575243
+  type: 'test'
+  ...
+# Subtest: optout persistence failures and full control fail acceptance immediately with sanitized failure and durable fallback hold
+ok 64 - optout persistence failures and full control fail acceptance immediately with sanitized failure and durable fallback hold
+  ---
+  duration_ms: 8.119563
+  type: 'test'
+  ...
+# Subtest: concurrent native safety fault wins over earlier queued gateway recovery and remains held
+ok 65 - concurrent native safety fault wins over earlier queued gateway recovery and remains held
+  ---
+  duration_ms: 1.377108
+  type: 'test'
+  ...
+# Subtest: gateway interruption during pending readiness is recoverable, not reclassified as a native retry loop
+ok 66 - gateway interruption during pending readiness is recoverable, not reclassified as a native retry loop
+  ---
+  duration_ms: 1.373733
+  type: 'test'
+  ...
+# Subtest: explicit End during queued gateway teardown retains its exact cutoff and durable hold
+ok 67 - explicit End during queued gateway teardown retains its exact cutoff and durable hold
+  ---
+  duration_ms: 0.801598
+  type: 'test'
+  ...
+# Subtest: coalescing cannot hide a brief over-cap eligible snapshot behind a later smaller poll
+ok 68 - coalescing cannot hide a brief over-cap eligible snapshot behind a later smaller poll
+  ---
+  duration_ms: 1.401608
+  type: 'test'
+  ...
+# Subtest: coalescing respects intervening End queue order so a later known-empty really releases its hold
+ok 69 - coalescing respects intervening End queue order so a later known-empty really releases its hold
+  ---
+  duration_ms: 1.506777
+  type: 'test'
+  ...
+# Subtest: first lone human creates a notice, only current member explicit consent opens/subscribes; bounded status is private
+ok 70 - first lone human creates a notice, only current member explicit consent opens/subscribes; bounded status is private
+  ---
+  duration_ms: 16.522381
+  type: 'test'
+  ...
+# Subtest: revoke invalidates synchronously before queued work, preserves accepted prefix, and rejoin never auto-consents
+ok 71 - revoke invalidates synchronously before queued work, preserves accepted prefix, and rejoin never auto-consents
+  ---
+  duration_ms: 12.042259
+  type: 'test'
+  ...
+# Subtest: leave invalidation during pending voice readiness rejects consent and every later callback
+ok 72 - leave invalidation during pending voice readiness rejects consent and every later callback
+  ---
+  duration_ms: 3.089889
+  type: 'test'
+  ...
+# Subtest: unknown occupancy is NOT empty, resets grace, stops gates and does not extend durations across unknown outage
+ok 73 - unknown occupancy is NOT empty, resets grace, stops gates and does not extend durations across unknown outage
+  ---
+  duration_ms: 5.924231
+  type: 'test'
+  ...
+# Subtest: known-empty grace only, one remaining person stays active; all participants cumulative durations preserved
+ok 74 - known-empty grace only, one remaining person stays active; all participants cumulative durations preserved
+  ---
+  duration_ms: 2.258624
+  type: 'test'
+  ...
+# Subtest: hard segmentation, >850ms gap and EOF preserve final bytes without inventing silence; stale callbacks ignored
+ok 75 - hard segmentation, >850ms gap and EOF preserve final bytes without inventing silence; stale callbacks ignored
+  ---
+  duration_ms: 4.464164
+  type: 'test'
+  ...
+# Subtest: old session drains in background while new session captures; global recognizer slot stays one
+ok 76 - old session drains in background while new session captures; global recognizer slot stays one
+  ---
+  duration_ms: 8.64328
+  type: 'test'
+  ...
+# Subtest: explicit end holds prompts until known empty, persists hold across recovery, and old notice cannot affect next session
+ok 77 - explicit end holds prompts until known empty, persists hold across recovery, and old notice cannot affect next session
+  ---
+  duration_ms: 15.991663
+  type: 'test'
+  ...
+# Subtest: drain deadline cancels accepted jobs explicitly, late recognition cannot rewrite result or overlap next call
+ok 78 - drain deadline cancels accepted jobs explicitly, late recognition cannot rewrite result or overlap next call
+  ---
+  duration_ms: 6.348947
+  type: 'test'
+  ...
+# Subtest: global pending queue overload accounts partial acceptance and rejection, stops capture immediately, never hides incompleteness
+ok 79 - global pending queue overload accounts partial acceptance and rejection, stops capture immediately, never hides incompleteness
+  ---
+  duration_ms: 9.012246
+  type: 'test'
+  ...
+# Subtest: spool and disk failures stop gating; accepted/rejected accounting and failure reasons remain explicit
+ok 80 - spool and disk failures stop gating; accepted/rejected accounting and failure reasons remain explicit
+  ---
+  duration_ms: 8.538028
+  type: 'test'
+  ...
+# Subtest: queue metadata commit failure preserves accepted durable PCM, faults explicitly, and accounts the eventual terminal job
+ok 81 - queue metadata commit failure preserves accepted durable PCM, faults explicitly, and accounts the eventual terminal job
+  ---
+  duration_ms: 2.753925
+  type: 'test'
+  ...
+# Subtest: restart recovers open PCM and old active durations only to durable lastSeenAt, no capture or auto-consent even when empty
+ok 82 - restart recovers open PCM and old active durations only to durable lastSeenAt, no capture or auto-consent even when empty
+  ---
+  duration_ms: 4.1782
+  type: 'test'
+  ...
+# Subtest: shutdown awaits capture EOF and native abort close, checkpoints accepted tail and queued jobs without publishing
+ok 83 - shutdown awaits capture EOF and native abort close, checkpoints accepted tail and queued jobs without publishing
+  ---
+  duration_ms: 1.788699
+  type: 'test'
+  ...
+# Subtest: consent/participant/session duration caps are protective, and actual audio faults invalidate gates synchronously
+ok 84 - consent/participant/session duration caps are protective, and actual audio faults invalidate gates synchronously
+  ---
+  duration_ms: 7.025085
+  type: 'test'
+  ...
+# Subtest: retained-session cap refuses a new capture explicitly without exceeding metadata bounds or disabling retention tick
+ok 85 - retained-session cap refuses a new capture explicitly without exceeding metadata bounds or disabling retention tick
+  ---
+  duration_ms: 2.344168
+  type: 'test'
+  ...
+# Subtest: notice/publication failures remain background-owned, do not block new capture or leak raw exceptions
+ok 86 - notice/publication failures remain background-owned, do not block new capture or leak raw exceptions
+  ---
+  duration_ms: 1.594987
+  type: 'test'
+  ...
+# Subtest: real port wiring: lone human notice, authenticated consent/revoke/leave, restart never opens audio automatically
+ok 87 - real port wiring: lone human notice, authenticated consent/revoke/leave, restart never opens audio automatically
+  ---
+  duration_ms: 40.53798
+  type: 'test'
+  ...
+# Subtest: normal feature cleanup preserves consented buffered EOF tail and holds the actual writer lock through close
+ok 88 - normal feature cleanup preserves consented buffered EOF tail and holds the actual writer lock through close
+  ---
+  duration_ms: 22.336944
+  type: 'test'
+  ...
+# Subtest: root strictly selects one owner and does not eagerly load legacy
+ok 89 - root strictly selects one owner and does not eagerly load legacy
+  ---
+  duration_ms: 0.969726
+  type: 'test'
+  ...
+# Subtest: root runtime selects exactly one feature for every strict flag value (fake client, no login)
+ok 90 - root runtime selects exactly one feature for every strict flag value (fake client, no login)
+  ---
+  duration_ms: 2.267999
+  type: 'test'
+  ...
+# Subtest: lock precedes recovery; recovery precedes membership; attachments stay unapproved
+ok 91 - lock precedes recovery; recovery precedes membership; attachments stay unapproved
+  ---
+  duration_ms: 1.738281
+  type: 'test'
+  ...
+# Subtest: shutdown during startup cannot create a store/coordinator after releasing the lock
+ok 92 - shutdown during startup cannot create a store/coordinator after releasing the lock
+  ---
+  duration_ms: 0.330547
+  type: 'test'
+  ...
+# Subtest: only exact current bot-authored notice and present human may use static IDs
+ok 93 - only exact current bot-authored notice and present human may use static IDs
+  ---
+  duration_ms: 0.817306
+  type: 'test'
+  ...
+# Subtest: leave immediately invalidates before blocked snapshot, revoke before acknowledgement
+ok 94 - leave immediately invalidates before blocked snapshot, revoke before acknowledgement
+  ---
+  duration_ms: 1.073145
+  type: 'test'
+  ...
+# Subtest: authenticated revoke calls durable core suppression before acknowledgement without any membership HTTP
+ok 95 - authenticated revoke calls durable core suppression before acknowledgement without any membership HTTP
+  ---
+  duration_ms: 0.9201
+  type: 'test'
+  ...
+# Subtest: Stop is authorized only by the exact current bot-owned notice, guild, channel and human account
+ok 96 - Stop is authorized only by the exact current bot-owned notice, guild, channel and human account
+  ---
+  duration_ms: 0.617553
+  type: 'test'
+  ...
+# Subtest: strangers cannot consume durable pause slots, but an accounted participant may Stop after leaving without HTTP
+ok 97 - strangers cannot consume durable pause slots, but an accounted participant may Stop after leaving without HTTP
+  ---
+  duration_ms: 0.485425
+  type: 'test'
+  ...
+# Subtest: a rejected revoke promise is observed even while acknowledgement is stalled
+ok 98 - a rejected revoke promise is observed even while acknowledgement is stalled
+  ---
+  duration_ms: 9.472088
+  type: 'test'
+  ...
+# Subtest: later Stop cancels an earlier Resume stalled at snapshot
+ok 99 - later Stop cancels an earlier Resume stalled at snapshot
+  ---
+  duration_ms: 4.837087
+  type: 'test'
+  ...
+# (node:100) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: later Stop cancels an earlier Resume stalled at acknowledgement
+ok 100 - later Stop cancels an earlier Resume stalled at acknowledgement
+  ---
+  duration_ms: 1.548987
+  type: 'test'
+  ...
+# Subtest: channel Resume requires known current presence and uses existing consent ID without claiming a consent click
+ok 101 - channel Resume requires known current presence and uses existing consent ID without claiming a consent click
+  ---
+  duration_ms: 0.862766
+  type: 'test'
+  ...
+# Subtest: membership changes during consent acknowledgement cannot restore consent
+ok 102 - membership changes during consent acknowledgement cannot restore consent
+  ---
+  duration_ms: 0.456092
+  type: 'test'
+  ...
+# Subtest: unknown occupancy stays null and gateway interruption invalidates synchronously
+ok 103 - unknown occupancy stays null and gateway interruption invalidates synchronously
+  ---
+  duration_ms: 0.378923
+  type: 'test'
+  ...
+# Subtest: periodic membership retry recovers a transient fetch failure without another voice event and is single-flight
+ok 104 - periodic membership retry recovers a transient fetch failure without another voice event and is single-flight
+  ---
+  duration_ms: 10.446188
+  type: 'test'
+  ...
+# Subtest: normal cleanup leaves gates to coordinator EOF/drain, blocks new buttons immediately and releases last
+ok 105 - normal cleanup leaves gates to coordinator EOF/drain, blocks new buttons immediately and releases last
+  ---
+  duration_ms: 0.483758
+  type: 'test'
+  ...
+# Subtest: feature failure retains immediate revocation, capture close and native shutdown
+ok 106 - feature failure retains immediate revocation, capture close and native shutdown
+  ---
+  duration_ms: 0.664804
+  type: 'test'
+  ...
+# Subtest: gateway disconnected during lock acquire never loses availability state
+ok 107 - gateway disconnected during lock acquire never loses availability state
+  ---
+  duration_ms: 0.559718
+  type: 'test'
+  ...
+# Subtest: gateway resumed during lock acquire never loses availability state
+ok 108 - gateway resumed during lock acquire never loses availability state
+  ---
+  duration_ms: 0.317339
+  type: 'test'
+  ...
+# Subtest: end synchronously cuts off all observed gates and invokes core before any HTTP
+ok 109 - end synchronously cuts off all observed gates and invokes core before any HTTP
+  ---
+  duration_ms: 0.482801
+  type: 'test'
+  ...
+# Subtest: end still rejects stale/cross-guild/foreign notices and absent or bot cache members
+ok 110 - end still rejects stale/cross-guild/foreign notices and absent or bot cache members
+  ---
+  duration_ms: 0.365715
+  type: 'test'
+  ...
+# Subtest: grant consent still waits for a fresh known membership snapshot
+ok 111 - grant consent still waits for a fresh known membership snapshot
+  ---
+  duration_ms: 0.250046
+  type: 'test'
+  ...
+# Subtest: status renders the real coordinator fields, with numeric incomplete and no invented publication state
+ok 112 - status renders the real coordinator fields, with numeric incomplete and no invented publication state
+  ---
+  duration_ms: 0.648595
+  type: 'test'
+  ...
+# Subtest: channel status uses actual fixed policy and bounded optout count, never identifiers or click claims
+ok 113 - channel status uses actual fixed policy and bounded optout count, never identifiers or click claims
+  ---
+  duration_ms: 0.433342
+  type: 'test'
+  ...
+# Subtest: REST transport is bounded, no retries/pings, handles files, and sanitizes errors
+ok 114 - REST transport is bounded, no retries/pings, handles files, and sanitizes errors
+  ---
+  duration_ms: 12.855565
+  type: 'test'
+  ...
+# Subtest: real OS writer lock and real durable store can share the same private root
+ok 115 - real OS writer lock and real durable store can share the same private root
+  ---
+  duration_ms: 19.572228
+  type: 'test'
+  ...
+# Subtest: shutdown retains the real writer lock through late POST acknowledgement and pending notice edit
+ok 116 - shutdown retains the real writer lock through late POST acknowledgement and pending notice edit
+  ---
+  duration_ms: 29.653827
+  type: 'test'
+  ...
+# Subtest: durable pipeline recognizes during the call but sends canonical only after EOF/accounting
+ok 117 - durable pipeline recognizes during the call but sends canonical only after EOF/accounting
+  ---
+  duration_ms: 13.676663
+  type: 'test'
+  ...
+# Subtest: old draining job does not block new capture; one global recognizer and isolated summaries
+ok 118 - old draining job does not block new capture; one global recognizer and isolated summaries
+  ---
+  duration_ms: 9.843052
+  type: 'test'
+  ...
+# Subtest: unknown occupancy revokes capture but is never treated as empty
+ok 119 - unknown occupancy revokes capture but is never treated as empty
+  ---
+  duration_ms: 4.74471
+  type: 'test'
+  ...
+# Subtest: long finalized transcript is durably held until explicitly approved, never a partial canonical post
+ok 120 - long finalized transcript is durably held until explicitly approved, never a partial canonical post
+  ---
+  duration_ms: 6.082818
+  type: 'test'
+  ...
+# Subtest: parent OFD remains locked after the acquiring helper exits; release permits another process
+ok 121 - parent OFD remains locked after the acquiring helper exits; release permits another process
+  ---
+  duration_ms: 25.782089
+  type: 'test'
+  ...
+# Subtest: real parent SIGKILL releases the lock without a holder, TTL or PID heuristics
+ok 122 - real parent SIGKILL releases the lock without a holder, TTL or PID heuristics
+  ---
+  duration_ms: 32.778716
+  type: 'test'
+  ...
+# Subtest: root or lock symlinks and permissive roots fail closed
+ok 123 - root or lock symlinks and permissive roots fail closed
+  ---
+  duration_ms: 6.409658
+  type: 'test'
+  ...
+# Subtest: transcription logger suppresses private HTTP error message/stack without even inspecting them
+ok 124 - transcription logger suppresses private HTTP error message/stack without even inspecting them
+  ---
+  duration_ms: 2.273208
+  type: 'test'
+  ...
+# Subtest: transcription logger init and Discord logging failures expose stable codes, not raw errors
+ok 125 - transcription logger init and Discord logging failures expose stable codes, not raw errors
+  ---
+  duration_ms: 0.779514
+  type: 'test'
+  ...
+# Subtest: strict opt-in keeps original legacy error diagnostics unchanged otherwise
+ok 126 - strict opt-in keeps original legacy error diagnostics unchanged otherwise
+  ---
+  duration_ms: 3.279726
+  type: 'test'
+  ...
+# Subtest: nonboolean attachment permission is rejected, including string false
+ok 127 - nonboolean attachment permission is rejected, including string false
+  ---
+  duration_ms: 1.207188
+  type: 'test'
+  ...
+# Subtest: recognized job inconsistent with no prior consent fails closed before HTTP
+ok 128 - recognized job inconsistent with no prior consent fails closed before HTTP
+  ---
+  duration_ms: 0.670845
+  type: 'test'
+  ...
+# Subtest: marker preserved but body edited cannot resolve an uncertain canonical send
+ok 129 - marker preserved but body edited cannot resolve an uncertain canonical send
+  ---
+  duration_ms: 1.621446
+  type: 'test'
+  ...
+# Subtest: attachment ambiguity remains for review: content-only history cannot verify attachment bytes
+ok 130 - attachment ambiguity remains for review: content-only history cannot verify attachment bytes
+  ---
+  duration_ms: 0.65897
+  type: 'test'
+  ...
+# Subtest: closing during an outstanding notice cannot resurrect enabled consent
+ok 131 - closing during an outstanding notice cannot resurrect enabled consent
+  ---
+  duration_ms: 8.417902
+  type: 'test'
+  ...
+# Subtest: notice accepted after timeout/closure is still disabled when late acknowledgement arrives
+ok 132 - notice accepted after timeout/closure is still disabled when late acknowledgement arrives
+  ---
+  duration_ms: 11.824046
+  type: 'test'
+  ...
+# Subtest: channel late notice acceptance stays policy-correct and drain owns its pending disabled edit
+ok 133 - channel late notice acceptance stays policy-correct and drain owns its pending disabled edit
+  ---
+  duration_ms: 50.892625
+  type: 'test'
+  ...
+# Subtest: bounded history pagination can reconcile on page two without resend
+ok 134 - bounded history pagination can reconcile on page two without resend
+  ---
+  duration_ms: 1.142937
+  type: 'test'
+  ...
+# Subtest: history exhaustion and repeated cursors are bounded and never cause resend
+ok 135 - history exhaustion and repeated cursors are bounded and never cause resend
+  ---
+  duration_ms: 4.885296
+  type: 'test'
+  ...
+# Subtest: independent sessions publish without waiting for another session HTTP response
+ok 136 - independent sessions publish without waiting for another session HTTP response
+  ---
+  duration_ms: 1.635154
+  type: 'test'
+  ...
+# Subtest: one completed inline summary has durations, safe transcript, stable nonce and no pings
+ok 137 - one completed inline summary has durations, safe transcript, stable nonce and no pings
+  ---
+  duration_ms: 3.713526
+  type: 'test'
+  ...
+# Subtest: no canonical send before session ready or while any accepted work remains
+ok 138 - no canonical send before session ready or while any accepted work remains
+  ---
+  duration_ms: 0.688804
+  type: 'test'
+  ...
+# Subtest: concurrent finalization calls share one send
+ok 139 - concurrent finalization calls share one send
+  ---
+  duration_ms: 1.443651
+  type: 'test'
+  ...
+# Subtest: durable intent failure prevents HTTP send entirely
+ok 140 - durable intent failure prevents HTTP send entirely
+  ---
+  duration_ms: 0.260922
+  type: 'test'
+  ...
+# Subtest: crash after successful remote send reconciles author and marker without resend
+ok 141 - crash after successful remote send reconciles author and marker without resend
+  ---
+  duration_ms: 0.766431
+  type: 'test'
+  ...
+# Subtest: HTTP failure/unknown delivery is held uncertain even when history is empty
+ok 142 - HTTP failure/unknown delivery is held uncertain even when history is empty
+  ---
+  duration_ms: 0.654929
+  type: 'test'
+  ...
+# Subtest: remote message accepted before network timeout is later reconciled, not duplicated
+ok 143 - remote message accepted before network timeout is later reconciled, not duplicated
+  ---
+  duration_ms: 0.573386
+  type: 'test'
+  ...
+# Subtest: a forged author or partial marker cannot resolve uncertain send
+ok 144 - a forged author or partial marker cannot resolve uncertain send
+  ---
+  duration_ms: 0.849641
+  type: 'test'
+  ...
+# Subtest: history errors never trigger a resend
+ok 145 - history errors never trigger a resend
+  ---
+  duration_ms: 0.970976
+  type: 'test'
+  ...
+# Subtest: changed payload after send intent cannot be silently republished
+ok 146 - changed payload after send intent cannot be silently republished
+  ---
+  duration_ms: 0.85764
+  type: 'test'
+  ...
+# Subtest: long output requires explicit attachment opt-in and sends no blank placeholder
+ok 147 - long output requires explicit attachment opt-in and sends no blank placeholder
+  ---
+  duration_ms: 1.044019
+  type: 'test'
+  ...
+# Subtest: result ordering is capture-time then sequence, not completion order
+ok 148 - result ordering is capture-time then sequence, not completion order
+  ---
+  duration_ms: 0.122335
+  type: 'test'
+  ...
+# Subtest: failed and cancelled work are explicit gaps with INCOMPLETE status
+ok 149 - failed and cancelled work are explicit gaps with INCOMPLETE status
+  ---
+  duration_ms: 0.125461
+  type: 'test'
+  ...
+# Subtest: nonconsenting meeting is not an empty transcript and no-observed-audio is incomplete
+ok 150 - nonconsenting meeting is not an empty transcript and no-observed-audio is incomplete
+  ---
+  duration_ms: 0.07171
+  type: 'test'
+  ...
+# Subtest: only exact no-speech jobs are labelled as silence; empty recognition is incomplete
+ok 151 - only exact no-speech jobs are labelled as silence; empty recognition is incomplete
+  ---
+  duration_ms: 0.078335
+  type: 'test'
+  ...
+# Subtest: untrusted transcript mentions, fences and controls are neutralized
+ok 152 - untrusted transcript mentions, fences and controls are neutralized
+  ---
+  duration_ms: 0.064376
+  type: 'test'
+  ...
+# Subtest: malformed session/account/job paths are rejected before publication
+ok 153 - malformed session/account/job paths are rejected before publication
+  ---
+  duration_ms: 0.15967
+  type: 'test'
+  ...
+# Subtest: notice consent, privacy, no-auto-resume and static controls; close is idempotent
+ok 154 - notice consent, privacy, no-auto-resume and static controls; close is idempotent
+  ---
+  duration_ms: 0.898391
+  type: 'test'
+  ...
+# Subtest: channel notice is automatic with one person and policy-correct static Resume/Stop/End controls
+ok 155 - channel notice is automatic with one person and policy-correct static Resume/Stop/End controls
+  ---
+  duration_ms: 1.188229
+  type: 'test'
+  ...
+# Subtest: legacy missing policy and explicit manual use identical manual notices, finals and closed labels
+ok 156 - legacy missing policy and explicit manual use identical manual notices, finals and closed labels
+  ---
+  duration_ms: 0.717513
+  type: 'test'
+  ...
+# Subtest: channel final attributes authorization to persisted company policy, not meeting button clicks
+ok 157 - channel final attributes authorization to persisted company policy, not meeting button clicks
+  ---
+  duration_ms: 0.20767
+  type: 'test'
+  ...
+# Subtest: publisher rejects invalid persisted policy before sending any notice or final
+ok 158 - publisher rejects invalid persisted policy before sending any notice or final
+  ---
+  duration_ms: 0.379299
+  type: 'test'
+  ...
+# Subtest: channel notice uncertainty preserves its persisted policy and reconciles without another send
+ok 159 - channel notice uncertainty preserves its persisted policy and reconciles without another send
+  ---
+  duration_ms: 0.352632
+  type: 'test'
+  ...
+# Subtest: notice send ambiguity is reconciled without creating a second consent prompt
+ok 160 - notice send ambiguity is reconciled without creating a second consent prompt
+  ---
+  duration_ms: 0.26713
+  type: 'test'
+  ...
+# Subtest: a hung transport is bounded and late acceptance is reconciled on next call
+ok 161 - a hung transport is bounded and late acceptance is reconciled on next call
+  ---
+  duration_ms: 15.18519
+  type: 'test'
+  ...
+# Subtest: raw private PCM -> unique private 16k mono WAV -> exact pinned base.en/English/CPU4 CLI; leaves source ownership to store
+ok 162 - raw private PCM -> unique private 16k mono WAV -> exact pinned base.en/English/CPU4 CLI; leaves source ownership to store
+  ---
+  duration_ms: 4.355703
+  type: 'test'
+  ...
+# Subtest: concurrent injected recognizers use distinct anonymous inodes, never overwrite one another
+ok 163 - concurrent injected recognizers use distinct anonymous inodes, never overwrite one another
+  ---
+  duration_ms: 1.311398
+  type: 'test'
+  ...
+# Subtest: skip only exact zero/no-data; one quiet nonzero sample anywhere must run recognition
+ok 164 - skip only exact zero/no-data; one quiet nonzero sample anywhere must run recognition
+  ---
+  duration_ms: 8.609072
+  type: 'test'
+  ...
+# Subtest: empty or whitespace-only model output for nonzero PCM stays a string, never verified noSpeech
+ok 165 - empty or whitespace-only model output for nonzero PCM stays a string, never verified noSpeech
+  ---
+  duration_ms: 0.729389
+  type: 'test'
+  ...
+# Subtest: reject missing/misaligned/size-mismatched/oversized/permissive/symlink/hardlink PCM before native command
+ok 166 - reject missing/misaligned/size-mismatched/oversized/permissive/symlink/hardlink PCM before native command
+  ---
+  duration_ms: 3.872861
+  type: 'test'
+  ...
+# Subtest: conversion/recognition/overflow/abort failures remove only private converted artifacts and sanitize exceptions
+ok 167 - conversion/recognition/overflow/abort failures remove only private converted artifacts and sanitize exceptions
+  ---
+  duration_ms: 3.098806
+  type: 'test'
+  ...
+# Subtest: sanitized child environment has no shell/secrets, privately bounded stdout; TERM/KILL abort awaits actual close
+ok 168 - sanitized child environment has no shell/secrets, privately bounded stdout; TERM/KILL abort awaits actual close
+  ---
+  duration_ms: 32.739132
+  type: 'test'
+  ...
+# Subtest: runtime deadline, output overflow and child error wait close rather than overlapping next native job
+ok 169 - runtime deadline, output overflow and child error wait close rather than overlapping next native job
+  ---
+  duration_ms: 108.439163
+  type: 'test'
+  ...
+# Subtest: spawn throws, pre-aborted jobs, nonzero exits and strict output cap all fail safely; 64KiB accepted
+ok 170 - spawn throws, pre-aborted jobs, nonzero exits and strict output cap all fail safely; 64KiB accepted
+  ---
+  duration_ms: 0.592011
+  type: 'test'
+  ...
+# Subtest: real child inherits an anonymous regular file via fd3, seekable across separate writer and reader processes
+ok 171 - real child inherits an anonymous regular file via fd3, seekable across separate writer and reader processes
+  ---
+  duration_ms: 36.473532
+  type: 'test'
+  ...
+# Subtest: real isolated subprocess deadline kills and waits close before returning; no bot or native recognizer launched
+ok 172 - real isolated subprocess deadline kills and waits close before returning; no bot or native recognizer launched
+  ---
+  duration_ms: 240.680088
+  type: 'test'
+  ...
+# Subtest: real ffmpeg explicit RAW s16le conversion yields 16kHz mono WAV with complete synthetic samples
+ok 173 - real ffmpeg explicit RAW s16le conversion yields 16kHz mono WAV with complete synthetic samples
+  ---
+  duration_ms: 55.457207
+  type: 'test'
+  ...
+# Subtest: one global slot across speakers/sessions; session fairness and capture-order stored output
+ok 174 - one global slot across speakers/sessions; session fairness and capture-order stored output
+  ---
+  duration_ms: 20.572955
+  type: 'test'
+  ...
+# Subtest: timeout requests abort but NEVER releases native slot until the recognizer settles
+ok 175 - timeout requests abort but NEVER releases native slot until the recognizer settles
+  ---
+  duration_ms: 27.853627
+  type: 'test'
+  ...
+# Subtest: drain cancellation durably accounts queued and active jobs, ignores late text, and holds global slot
+ok 176 - drain cancellation durably accounts queued and active jobs, ignores late text, and holds global slot
+  ---
+  duration_ms: 6.843915
+  type: 'test'
+  ...
+# Subtest: shutdown awaits abort close, checkpoints running as queued and does not drain backlog
+ok 177 - shutdown awaits abort close, checkpoints running as queued and does not drain backlog
+  ---
+  duration_ms: 3.563481
+  type: 'test'
+  ...
+# Subtest: recognizer failure, no-speech, invalid/oversized output and total text cap are terminal and sanitized
+ok 178 - recognizer failure, no-speech, invalid/oversized output and total text cap are terminal and sanitized
+  ---
+  duration_ms: 6.036901
+  type: 'test'
+  ...
+# Subtest: empty model output on nonzero or quiet PCM is incomplete, never mislabeled exact-zero no-speech
+ok 179 - empty model output on nonzero or quiet PCM is incomplete, never mislabeled exact-zero no-speech
+  ---
+  duration_ms: 1.530236
+  type: 'test'
+  ...
+# Subtest: failed durable terminal write pauses scheduler without deleting source or launching another recognizer
+ok 180 - failed durable terminal write pauses scheduler without deleting source or launching another recognizer
+  ---
+  duration_ms: 1.696572
+  type: 'test'
+  ...
+# Subtest: only explicit typed noSpeech backed by exact-zero qualifies; plain/typed empty text stays incomplete
+ok 181 - only explicit typed noSpeech backed by exact-zero qualifies; plain/typed empty text stays incomplete
+  ---
+  duration_ms: 3.111515
+  type: 'test'
+  ...
+# [dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  override existing env vars with { override: true }
+# Subtest: awaits async checkpoint/release before destroy; duplicate signals share shutdown
+ok 182 - awaits async checkpoint/release before destroy; duplicate signals share shutdown
+  ---
+  duration_ms: 1.389275
+  type: 'test'
+  ...
+# Subtest: hung cleanup has a global deadline, destroys client, exits nonzero
+ok 183 - hung cleanup has a global deadline, destroys client, exits nonzero
+  ---
+  duration_ms: 15.906495
+  type: 'test'
+  ...
+# Subtest: cleanup rejection is handled, remaining callbacks awaited, no private error logged
+ok 184 - cleanup rejection is handled, remaining callbacks awaited, no private error logged
+  ---
+  duration_ms: 0.544677
+  type: 'test'
+  ...
+# Subtest: client destruction itself is bounded by the same deadline
+ok 185 - client destruction itself is bounded by the same deadline
+  ---
+  duration_ms: 10.650817
+  type: 'test'
+  ...
+# Subtest: separate writer process SIGKILL leaves durable open/queued/running/result records recoverable without its memory
+ok 186 - separate writer process SIGKILL leaves durable open/queued/running/result records recoverable without its memory
+  ---
+  duration_ms: 46.860178
+  type: 'test'
+  ...
+# Subtest: startup preserves validated flock inode and removes only exact validated conversion crash namespace
+ok 187 - startup preserves validated flock inode and removes only exact validated conversion crash namespace
+  ---
+  duration_ms: 6.065151
+  type: 'test'
+  ...
+# Subtest: startup refuses conversion/lock symlinks and linked or loose metadata rather than following them
+ok 188 - startup refuses conversion/lock symlinks and linked or loose metadata rather than following them
+  ---
+  duration_ms: 0.855848
+  type: 'test'
+  ...
+# Subtest: failed append AND failed rollback quarantine new writes and count uncertain physical spool until terminal cleanup
+ok 189 - failed append AND failed rollback quarantine new writes and count uncertain physical spool until terminal cleanup
+  ---
+  duration_ms: 0.739847
+  type: 'test'
+  ...
+# Subtest: JSON file and parent directory are fsynced; rename failure preserves previous record and removes temporary output
+ok 190 - JSON file and parent directory are fsynced; rename failure preserves previous record and removes temporary output
+  ---
+  duration_ms: 2.108996
+  type: 'test'
+  ...
+# Subtest: private control is one boolean, atomically fsynced and retained without speech/account records
+ok 191 - private control is one boolean, atomically fsynced and retained without speech/account records
+  ---
+  duration_ms: 0.757638
+  type: 'test'
+  ...
+# Subtest: startup validates control structure, mode, links and size without following unsafe files
+ok 192 - startup validates control structure, mode, links and size without following unsafe files
+  ---
+  duration_ms: 0.983226
+  type: 'test'
+  ...
+# Subtest: expiry is recovery-only: normal pruning leaves live PCM, fresh abandoned work remains recoverable
+ok 193 - expiry is recovery-only: normal pruning leaves live PCM, fresh abandoned work remains recoverable
+  ---
+  duration_ms: 1.882117
+  type: 'test'
+  ...
+# Subtest: interrupted expiry deletion is restart-idempotent and never leaves orphan dependencies
+ok 194 - interrupted expiry deletion is restart-idempotent and never leaves orphan dependencies
+  ---
+  duration_ms: 2.080579
+  type: 'test'
+  ...
+# Subtest: session policy is persisted, defaults manual, accepts legacy absence and rejects invalid optional policy
+ok 195 - session policy is persisted, defaults manual, accepts legacy absence and rejects invalid optional policy
+  ---
+  duration_ms: 6.094277
+  type: 'test'
+  ...
+# Subtest: old control migrates privately; optouts survive hold changes, restart and metadata pruning
+ok 196 - old control migrates privately; optouts survive hold changes, restart and metadata pruning
+  ---
+  duration_ms: 3.150015
+  type: 'test'
+  ...
+# Subtest: control rejects extra fields, duplicate/invalid/over-cap optouts and invalid API inputs
+ok 197 - control rejects extra fields, duplicate/invalid/over-cap optouts and invalid API inputs
+  ---
+  duration_ms: 6.212403
+  type: 'test'
+  ...
+# Subtest: optout writes and clears fsync file plus directory; failed commits do not acknowledge memory changes
+ok 198 - optout writes and clears fsync file plus directory; failed commits do not acknowledge memory changes
+  ---
+  duration_ms: 0.921225
+  type: 'test'
+  ...
+# Subtest: private root/file ownership, mode, symlink and filename gates; contract defaults
+ok 199 - private root/file ownership, mode, symlink and filename gates; contract defaults
+  ---
+  duration_ms: 3.404728
+  type: 'test'
+  ...
+# Subtest: job metadata precedes audio creation; accepted append is fsynced without rewriting historical JSON
+ok 200 - job metadata precedes audio creation; accepted append is fsynced without rewriting historical JSON
+  ---
+  duration_ms: 0.817098
+  type: 'test'
+  ...
+# Subtest: restart recovers open PCM from actual aligned length, requeues queued/running, retains terminal text
+ok 201 - restart recovers open PCM from actual aligned length, requeues queued/running, retains terminal text
+  ---
+  duration_ms: 10.731319
+  type: 'test'
+  ...
+# Subtest: missing, unaligned and changed sealed PCM become explicit durable failures and are removed
+ok 202 - missing, unaligned and changed sealed PCM become explicit durable failures and are removed
+  ---
+  duration_ms: 1.839783
+  type: 'test'
+  ...
+# Subtest: terminal output commits before PCM unlink; restart idempotently cleans terminal PCM
+ok 203 - terminal output commits before PCM unlink; restart idempotently cleans terminal PCM
+  ---
+  duration_ms: 1.017644
+  type: 'test'
+  ...
+# Subtest: failed result commit never removes PCM; fsync failure is not accepted and rollback preserves old prefix
+ok 204 - failed result commit never removes PCM; fsync failure is not accepted and rollback preserves old prefix
+  ---
+  duration_ms: 0.72993
+  type: 'test'
+  ...
+# Subtest: global spool/queue/utterance/transcript/record caps reject rather than silently exceed
+ok 205 - global spool/queue/utterance/transcript/record caps reject rather than silently exceed
+  ---
+  duration_ms: 1.095186
+  type: 'test'
+  ...
+# Subtest: pending, raw spool and transcript budgets are shared globally by old and new sessions
+ok 206 - pending, raw spool and transcript budgets are shared globally by old and new sessions
+  ---
+  duration_ms: 1.37515
+  type: 'test'
+  ...
+# Subtest: publisher shallow patches preserve coordinator fields and transcript sorting is capture-time then allocation
+ok 207 - publisher shallow patches preserve coordinator fields and transcript sorting is capture-time then allocation
+  ---
+  duration_ms: 0.927933
+  type: 'test'
+  ...
+# Subtest: retention deletes expired ready/published metadata, never active or pending PCM; session cap is explicit
+ok 208 - retention deletes expired ready/published metadata, never active or pending PCM; session cap is explicit
+  ---
+  duration_ms: 6.55866
+  type: 'test'
+  ...
+# Subtest: corrupt bounded metadata and orphan files fail startup closed, not silently discarded
+ok 209 - corrupt bounded metadata and orphan files fail startup closed, not silently discarded
+  ---
+  duration_ms: 0.427008
+  type: 'test'
+  ...
+1..209
+# tests 209
+# suites 0
+# pass 209
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 560.330683
+
+== Actual ffmpeg resampling, no private audio ==
+codec_name=pcm_s16le
+sample_rate=16000
+channels=1
+
+PASS: offline image preflight, no bot login/live audio/deployment.
+whisper_init_from_file_with_params_no_state: loading model from '/opt/models/ggml-base.en.bin'
+whisper_init_with_params_no_state: use gpu    = 0
+whisper_init_with_params_no_state: flash attn = 1
+whisper_init_with_params_no_state: gpu_device = 0
+whisper_init_with_params_no_state: dtw        = 0
+whisper_init_with_params_no_state: devices    = 1
+whisper_init_with_params_no_state: backends   = 1
+whisper_model_load: loading model
+whisper_model_load: n_vocab       = 51864
+whisper_model_load: n_audio_ctx   = 1500
+whisper_model_load: n_audio_state = 512
+whisper_model_load: n_audio_head  = 8
+whisper_model_load: n_audio_layer = 6
+whisper_model_load: n_text_ctx    = 448
+whisper_model_load: n_text_state  = 512
+whisper_model_load: n_text_head   = 8
+whisper_model_load: n_text_layer  = 6
+whisper_model_load: n_mels        = 80
+whisper_model_load: ftype         = 1
+whisper_model_load: qntvr         = 0
+whisper_model_load: type          = 2 (base)
+whisper_model_load: adding 1607 extra tokens
+whisper_model_load: n_langs       = 99
+whisper_model_load:          CPU total size =   147.37 MB
+whisper_model_load: model size    =  147.37 MB
+whisper_backend_init_gpu: no GPU found
+whisper_init_state: kv self size  =    6.29 MB
+whisper_init_state: kv cross size =   18.87 MB
+whisper_init_state: kv pad  size  =    3.15 MB
+whisper_init_state: compute buffer (conv)   =   16.28 MB
+whisper_init_state: compute buffer (encode) =   23.09 MB
+whisper_init_state: compute buffer (cross)  =    4.66 MB
+whisper_init_state: compute buffer (decode) =   96.37 MB
+read_audio_data: reading audio data from '/fixtures/jfk.wav' ...
+read_audio_data: trying to decode with miniaudio
+
+system_info: n_threads = 4 / 18 | WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : NEON = 1 | ARM_FMA = 1 | REPACK = 1 | 
+
+main: processing '/fixtures/jfk.wav' (176000 samples, 11.0 sec), 4 threads, 1 processors, 5 beams + best of 5, lang = en, task = transcribe, timestamps = 1 ...
+
+output_txt: saving output to '/data/transcription/public-full-XXfPpOFG/transcript.txt'
+
+whisper_print_timings:     load time =    34.01 ms
+whisper_print_timings:     fallbacks =   0 p /   0 h
+whisper_print_timings:      mel time =     3.28 ms
+whisper_print_timings:   sample time =    44.01 ms /   133 runs (     0.33 ms per run)
+whisper_print_timings:   encode time =   902.65 ms /     1 runs (   902.65 ms per run)
+whisper_print_timings:   decode time =     7.01 ms /     3 runs (     2.34 ms per run)
+whisper_print_timings:   batchd time =   208.84 ms /   126 runs (     1.66 ms per run)
+whisper_print_timings:   prompt time =     0.00 ms /     1 runs (     0.00 ms per run)
+whisper_print_timings:    total time =  1209.79 ms
+
+[00:00:00.000 --> 00:00:11.000]   And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.
+And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.
+{"kind":"public_fixture_only","pcmBytes":1536000,"helperWallMs":1195,"text":"And so my fellow Americans, ask not what your country can do for you.","limitation":"Not private-call accuracy, DAVE receive, sustained multi-speaker capacity, or RK3588 timing evidence."}
+
+PASS: fresh public English fixture + actual helper; not call accuracy/hardware-capacity proof.

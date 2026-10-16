@@ -1,0 +1,1 @@
+sha256:95ec8530411a46da786ffa2e14d7f6511f0759b03dd170c25ade012e23ded72a linux/arm64 user=nodejs entrypoint=["/sbin/tini","--","docker-entrypoint.sh"] cmd=["node","index.js"]

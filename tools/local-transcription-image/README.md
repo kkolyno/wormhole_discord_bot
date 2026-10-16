@@ -1,7 +1,10 @@
 # Credential-free ARM64 image checks
 
 See `docs/LOCAL_TRANSCRIPTION_RESULTS.md` for final scope, counts and limitations.
-These helpers do not authorize deployment, bot login, or recording.
+These helpers do not authorize deployment, bot login, or recording. The latest
+standing-company-consent checks are recorded separately in
+`docs/STANDING_CONSENT_RESULTS.md` and `evidence/channel-consent/`; the parent
+folder's 159-test image is a historical manual-policy snapshot.
 
 Run installations/builds/checks **inside an approved disposable Linux/ARM64
 worker**, with source at `/ws`, no production credentials or private audio:
@@ -12,7 +15,8 @@ node --test test/local-transcription/*.test.js
 docker build --platform linux/arm64 -f Dockerfile.transcription \
   -t local-transcription-dev:reviewed .
 python3 -B tools/local-transcription-image/smoke.py \
-  --image local-transcription-dev:reviewed
+  --image local-transcription-dev:reviewed \
+  --evidence tools/local-transcription-image/evidence/reviewed-run
 ```
 
 The smoke driver fetches only the fixed public JFK fixture from pinned

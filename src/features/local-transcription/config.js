@@ -15,8 +15,10 @@ function loadConfig(env = process.env) {
   if (![guildId, channelId, alertsChannelId].every(id => ACCOUNT_ID.test(id || ''))) throw configError();
   const root = env.LOCAL_TRANSCRIPTION_DATA_DIR || '/data/transcription';
   if (!path.isAbsolute(root) || path.normalize(root) !== root || root === '/') throw configError();
+  const consentMode = env.LOCAL_TRANSCRIPTION_CONSENT_MODE === undefined ? 'manual' : env.LOCAL_TRANSCRIPTION_CONSENT_MODE;
+  if (!['manual', 'channel'].includes(consentMode)) throw configError();
   return Object.freeze({
-    guildId, channelId, alertsChannelId, root,
+    guildId, channelId, alertsChannelId, root, consentMode,
     allowAttachments: env.LOCAL_TRANSCRIPT_ATTACHMENTS === 'true',
     restTimeoutMs: 10000,
     limits: Object.freeze({

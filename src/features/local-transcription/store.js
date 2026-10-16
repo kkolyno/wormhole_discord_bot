@@ -70,13 +70,32 @@ class Store {
   getControl() { return clone(this.control); }
   setHoldUntilEmpty(holdUntilEmpty) {
     if (typeof holdUntilEmpty !== 'boolean') fail('CONTROL_CORRUPT');
-    const control = { holdUntilEmpty };
+    const control = { ...this.control, holdUntilEmpty };
     this.atomicFile(path.join(this.root, '.control.json'), control);
     this.control = control; return this.getControl();
   }
+  getAutomaticOptOuts() { return [...(this.control.automaticOptOuts || [])]; }
+  setAutomaticOptOut(userId, paused) {
+    account(userId);
+    if (typeof paused !== 'boolean') fail('CONTROL_CORRUPT');
+    const ids = new Set(this.getAutomaticOptOuts());
+    if (paused) ids.add(userId); else ids.delete(userId);
+    if (ids.size > 32) fail('AUTOMATIC_OPTOUT_LIMIT');
+    const control = { ...this.control };
+    if (ids.size) control.automaticOptOuts = [...ids]; else delete control.automaticOptOuts;
+    this.atomicFile(path.join(this.root, '.control.json'), control);
+    this.control = control; return this.getAutomaticOptOuts();
+  }
+  clearAutomaticOptOuts() {
+    if (!this.getAutomaticOptOuts().length) return;
+    const control = { ...this.control }; delete control.automaticOptOuts;
+    this.atomicFile(path.join(this.root, '.control.json'), control);
+    this.control = control;
+  }
   validateSession(s) {
     safeId(s.id);
-    if (s.schema !== 1 || !['active', 'draining', 'ready', 'published'].includes(s.phase) || !Number.isFinite(s.startedAt) ||
+    if ((s.consentMode !== undefined && !['manual', 'channel'].includes(s.consentMode)) ||
+        s.schema !== 1 || !['active', 'draining', 'ready', 'published'].includes(s.phase) || !Number.isFinite(s.startedAt) ||
         !Number.isFinite(s.lastSeenAt) || !(s.endedAt === null || Number.isFinite(s.endedAt)) ||
         !s.participants || Array.isArray(s.participants) || Object.keys(s.participants).length > this.limits.maxParticipants ||
         !Array.isArray(s.issues) || s.issues.length > 64 || s.issues.some(c => issue(c) !== c) ||
@@ -112,8 +131,12 @@ class Store {
     for (const name of names) {
       if (name === '.control.json') {
         const control = this.readJson(path.join(this.root, name));
-        if (!control || Object.keys(control).length !== 1 || typeof control.holdUntilEmpty !== 'boolean') fail('CONTROL_CORRUPT');
-        this.control = { holdUntilEmpty: control.holdUntilEmpty }; continue;
+        if (!control || Array.isArray(control) || typeof control.holdUntilEmpty !== 'boolean' ||
+            Object.keys(control).some(key => !['holdUntilEmpty', 'automaticOptOuts'].includes(key)) ||
+            (Object.hasOwn(control, 'automaticOptOuts') && (!Array.isArray(control.automaticOptOuts) ||
+              control.automaticOptOuts.length > 32 || new Set(control.automaticOptOuts).size !== control.automaticOptOuts.length ||
+              control.automaticOptOuts.some(id => typeof id !== 'string' || !ACCOUNT.test(id))))) fail('CONTROL_CORRUPT');
+        this.control = clone(control); continue;
       }
       if (name === '.writer.lock') {
         const fd = this.checkedFd(path.join(this.root, name));
@@ -170,10 +193,10 @@ class Store {
     const s = this.validateSession({ ...old, ...clone(patch), id, schema: 1 });
     this.atomic('s', id, s); this.sessions.set(id, s); return clone(s);
   }
-  createSession({ id = randomUUID(), startedAt, participants = {} }) {
+  createSession({ id = randomUUID(), startedAt, participants = {}, consentMode = 'manual' }) {
     safeId(id); if (this.sessions.has(id)) fail('SESSION_EXISTS');
     if (this.sessions.size >= this.limits.maxRetainedSessions) fail('SESSION_LIMIT');
-    const s = this.validateSession({ schema: 1, id, startedAt, endedAt: null, lastSeenAt: startedAt, phase: 'active',
+    const s = this.validateSession({ schema: 1, id, startedAt, consentMode, endedAt: null, lastSeenAt: startedAt, phase: 'active',
       participants: clone(participants), issues: [], stopReason: null, notice: { state: 'pending' }, publication: { state: 'pending' } });
     this.atomic('s', id, s); this.sessions.set(id, s); return clone(s);
   }

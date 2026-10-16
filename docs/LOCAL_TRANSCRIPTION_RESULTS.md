@@ -2,6 +2,12 @@
 
 Date: 2026-10-15. Branch: `feat/rk3588-local-transcription`.
 
+**Historical manual-policy baseline:** the 159-test image and source manifest below
+belong to implementation commit `a1ca0ba`. Later company standing-consent automation
+changes are separately specified and verified in `STANDING_CONSENT_CONTRACT.md`
+and `STANDING_CONSENT_RESULTS.md`; do not treat this older image/hash manifest as
+verification of the new policy code.
+
 ## Status and scope
 
 The durable meeting feature is implemented and opt-in, **not published or deployed**. Oracle was left on the previously authorized one-shot image, whose test has finished. Its supervisor is designed to resume the original meeting feature afterward; this implementation phase did not independently recheck that application handoff. This change does not silently activate recording or rearm that test.

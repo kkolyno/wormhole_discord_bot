@@ -1,0 +1,2 @@
+PASS: second container excluded by OS flock
+PASS: next container acquired after holder stopped

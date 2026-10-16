@@ -9,7 +9,20 @@ had BOT_MOVED_OR_DEAFENED after duration_limit. The old adapter lacks an intenti
 teardown guard in its VoiceStateUpdate listener: new code must distinguish this
 from actual disconnect/deafen faults. No private audio/transcript enters workers.
 
-## Ownership
+## Standing-consent extension
+
+`docs/STANDING_CONSENT_CONTRACT.md` extends this original manual-mode contract.
+`LOCAL_TRANSCRIPTION_CONSENT_MODE=manual|channel` is a strict enum, default manual;
+empty, whitespace and other values fail validation. The feature itself remains
+OFF/legacy by default. Only an administrator's environment setting, applied by
+restart/container recreate (not hot reload or an employee command), selects policy.
+Channel is operator attestation of valid standing company consent for ALL humans
+admitted to the configured private channel, including guests and anyone audible
+through shared microphones. The operator owns consent/access controls; otherwise
+use manual mode or a separate channel. No other-channel/global authorization is
+implied. Long attachments remain unapproved and OFF.
+
+## Original ownership (standing-consent task ownership is delegated separately)
 
 - Core worker: `src/features/local-transcription/{store,scheduler,coordinator}.js`,
   `test/local-transcription/{store,scheduler,coordinator}*.test.js` only.
@@ -29,17 +42,36 @@ Preserve original meetings feature unchanged and select either it OR this featur
 in root index using strict LOCAL_TRANSCRIPTION_ENABLED=true; never two summary
 owners. Disabled is original behavior. Enabled: first known human in configured
 voice channel creates a session and posts a notice. Joining alone is supported.
-Only each account explicitly clicking consent while in that voice channel is
-subscribed. Stop-own-microphone really revokes consent immediately. Leave/rejoin,
-gateway/voice interruption and restart invalidate consent; no silent auto-resume.
-Shared-mic consent warning required. No external STT and no private speech logs.
+In default manual mode, only each account explicitly clicking consent while in
+that voice channel is subscribed. Leave/rejoin, gateway/voice interruption and
+restart invalidate manual consent; no silent manual auto-resume. In explicit
+channel mode, known occupants (including one lone person and an occupied room at
+startup) are authorized automatically, without notice-click/send acknowledgement
+dependency. Eligible gateway recovery and normal restart may automatically open
+capture ONLY under channel policy; unknown occupancy immediately removes gates.
+Stop-own-microphone synchronously removes gates and persists automatic suppression
+before snapshot/interaction HTTP. Polling, join/rejoin, unknown occupancy, restart
+or metadata pruning cannot regrant paused accounts. Current-notice Resume while
+known present, or a known empty channel, clears the pause; an earlier pending
+Resume cannot erase a later Stop. End/safety holds, deliberate move/deafen,
+overload/disk/native faults, capacity and max-duration stops are never bypassed by
+automation. The default/maximum four-hour session cap remains, not unlimited
+uninterrupted recording or unbounded retry. Shared-mic consent warning required.
+No external STT and no private speech logs.
 
 Use static button IDs local_transcription_consent, local_transcription_revoke,
 local_transcription_end. Validate guild, alerts channel, bot message author, exact
-current notice ID, human user and current voice membership. End stops capture for
+current notice ID, human user and current voice membership for grants/End. Own
+Stop requires exact authenticated notice/account but no successful later snapshot;
+call coordinator.revoke immediately, observe its promise even while interaction
+acknowledgement stalls, then acknowledge. End stops capture for
 this session, holds off new prompts until a known empty channel has been observed.
-No misleading No-notes button. Status command explains recording, queue, draining,
-incomplete or held publication without exposing transcript text.
+No misleading No-notes button. Channel consent ID is labeled Resume my microphone;
+Stop/End IDs are unchanged. Notice/final/closed labels read persisted session policy
+(legacy missing means manual), never the current environment. Channel labels
+explain standing consent, not falsely that accounts clicked. Status shows fixed
+`consentMode`, bounded `automaticOptOuts` count (0–32), recording, queue, draining,
+incomplete or held publication without transcript text, account IDs or untrusted text.
 
 End after continuously KNOWN empty channel for configured empty grace (default
 90s); one person remaining does not end the call. Unknown occupancy is not empty.
@@ -47,7 +79,8 @@ Explicit end, max duration, capture fault/overload and restart mark appropriate
 reasons; interruptions are explicit incomplete. Metadata tracks ALL participants
 and accumulated durations. Recover active session durations only to last durable
 lastSeenAt, not across an unknown outage. Rejoin within empty grace is same session
-but requires fresh per-account consent. New sessions can capture while old ones
+but requires fresh per-account consent in manual mode; channel mode may authorize
+known unpaused accounts without a click. New sessions can capture while old ones
 recognize/publish; no awaiting drain in the serialized lifecycle event queue.
 
 ## Shared data/API (coordinate deviations before changing)
@@ -57,12 +90,14 @@ Date.now. Valid account IDs are 17–20 digit strings. Session IDs are randomUUI
 filenames use strictly validated safe IDs, never user display names.
 
 Session record (store JSON):
-{schema:1,id,startedAt,endedAt:null|number,lastSeenAt,phase:'active'|'draining'|
+{schema:1,id,startedAt,consentMode:'manual'|'channel',endedAt:null|number,lastSeenAt,phase:'active'|'draining'|
 'ready'|'published',participants:{[id]:{id,name,joinedAt:null|number,durationMs,
 consented:boolean,everConsented:boolean}},issues:[],stopReason:null|string,
 notice:{state:'pending'|'sending'|'sent'|'uncertain'|'closed',id?:string},
 publication:{state:'pending'|'sending'|'sent'|'uncertain'|'held',...}}
-Additional bounded metadata fields may be added. Use store.patchSession(id,patch)
+`consentMode` is optional only for old records (missing means manual); validate it
+strictly when present. `everConsented` also means standing-policy capture was
+authorized, not proof of a button click. Additional bounded metadata fields may be added. Use store.patchSession(id,patch)
 (read-current + shallow-patch synchronously) so publisher/coord never overwrite
 one another's fields from stale async snapshots.
 
@@ -89,17 +124,37 @@ max transcript bytes4MiB, max retained sessions64, metadata/transcript retention
 These are protective caps, NOT measured multi-speaker capacity claims. Refuse/fault
 clearly rather than silently discard or exceed caps. Delete raw PCM on terminal
 recognition/failure/cancellation; keep only bounded recovery data while needed.
+Store.createSession({startedAt,consentMode='manual'}) persists the fixed policy.
 Store also exposes getControl()/setHoldUntilEmpty(bool); private .control.json
-contains only this safety boolean so retention cannot erase a wait-until-empty
-hold. Startup recovery expires abandoned data before any recognition/publication.
+preserves the safety boolean independently of transcript/session retention. Old
+boolean-only files remain valid and the old getControl shape may remain unchanged
+when no suppressions exist. Optional `automaticOptOuts:[accountId,...]` contains at
+most 32 unique validated IDs. These control IDs deliberately persist beyond
+session/transcript retention until known empty/explicit resume; no audio, names or
+transcripts are stored here. Unknown fields, duplicate/invalid/over-cap IDs fail
+closed. Same no-follow/0600/atomic JSON+directory fsync guarantees apply.
+getAutomaticOptOuts(), setAutomaticOptOut(userId,paused), clearAutomaticOptOuts()
+encapsulate this state; setting the hold MUST preserve optouts. Failure to persist
+Stop immediately stops acceptance and surfaces sanitized failure, never durable
+success or an automatic regrant. Startup expires abandoned data before any
+recognition/publication, without deleting these independent control choices.
 
-new Coordinator({store,audio,recognize,publisher,now,limits})
+new Coordinator({store,audio,recognize,publisher,now,limits,consentMode='manual'})
+- constructor validates exact manual|channel; status returns fixed consentMode
+  and automaticOptOuts count, not account IDs.
 - async init(): recover durable jobs/sessions even with empty current channel;
-  interrupted active sessions end/invalidate consent; no restart capture.
+  interrupted active sessions end/invalidate manual consent. Only channel mode
+  may start new capture after known nonempty membership, respecting durable holds.
 - async membership(members|null): members [{id,name}], known snapshot; null unknown.
 - invalidate(userId): SYNCHRONOUS consent gate removal, called immediately on leave
   BEFORE any awaited lifecycle queue; subsequent PCM must not be accepted.
-- async consent(userId,noticeId), async revoke(userId,noticeId), async end(noticeId)
+- async consent(userId,noticeId), async revoke(userId,noticeId), async end(noticeId).
+  revoke must synchronously cut off gates and persist standing-policy suppression
+  before returning its observed promise; End retains immediate privacy cutoff.
+  Grants recheck runtime/known membership/optout/mode/epoch/stopping state after
+  every async boundary. Use a shared internal grant helper, not recursive queued
+  consent from inside membership's lifecycle queue. Bound/coalesce automatic work;
+  over maxConsenting must explicitly refuse/stop, not silently record eight of nine.
 - async fault(code), async tick(), async shutdown(); status() returns bounded metadata.
 - lifecycle methods serialized internally; capture callbacks do synchronous bounded
   durable writes, guarded by session object/consent gate, never mutable next session.
@@ -144,7 +199,10 @@ async history({limit,before})->[{id,authorId,content,createdTimestamp}].
 transport has botUserId. All sends bounded at transport layer with AbortSignal/
 REST timeout; ambiguous sends never blindly retried. publisher patches only notice
 and publication fields (phase published only after acknowledged/reconciled send).
-Notice uses three static buttons and states consent/stop/end/retention/coverage.
+Notice uses three static buttons and states consent/stop/end/retention/coverage,
+with session-policy-specific automatic/Resume versus manual/click labels. Channel
+notice is asynchronous and cannot gate automatic recording; failed/uncertain notice
+HTTP does not grant or revoke policy authorization.
 Canonical publication is ONE completed message: participant durations + transcript
 inline, or attachment ONLY if LOCAL_TRANSCRIPT_ATTACHMENTS=true (defaultfalse).
 Long text without approval -> durable held publication, no blank canonical post.

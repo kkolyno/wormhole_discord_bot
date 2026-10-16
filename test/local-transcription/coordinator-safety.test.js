@@ -23,7 +23,7 @@ async function fixture(t, options = {}) {
     closeNotice: async id => { closes.push(id); const s = store.getSession(id); store.patchSession(id, { notice: { ...s.notice, state: 'closed' } }); },
     publish: async id => { publications.push(id); store.patchSession(id, { phase: 'published', publication: { state: 'sent' } }); },
   };
-  const c = new Coordinator({ store, audio, publisher, now: () => time, recognize: options.recognize || (async () => 'words'),
+  const c = new Coordinator({ store, audio, publisher, consentMode: options.consentMode || 'manual', now: () => time, recognize: options.recognize || (async () => 'words'),
     limits: { maxSessionMs: 100, emptyGraceMs: 90, audioOpenMs: 1000, audioCloseMs: 1000, ...options.limits } });
   t.after(async () => { await c.shutdown(); if (!options.keepRoot) fs.rmSync(root, { recursive: true, force: true }); });
   await c.init(); const notice = () => `n-${c.current.id}`;
@@ -78,6 +78,35 @@ test('closed old notice revoke removes only old closing gate, never new runtime 
   f.time(1100); await f.c.tick(); await until(() => release); f.c.startSession(1100);
   const revoke = f.c.revoke(U, oldNotice); assert.equal(f.pcm(old), false); assert.equal(rt.gates.size, 0);
   assert.equal(f.c.epochs.size, 0); await revoke; release(); await until(() => !f.c.runtimes.has(rt));
+});
+
+test('current-notice Stop cuts off an older physical capture runtime as well as current gates', async t => {
+  let old, release;
+  const f = await fixture(t, { audio: { open: async callbacks => {
+    old = callbacks; return { setConsented: async () => {}, close: () => new Promise(r => { release = r; }) };
+  } } });
+  await f.start(); await f.c.consent(U, f.notice());
+  f.time(1100); await f.c.tick(); await until(() => release); f.c.startSession(1100);
+  const id = f.c.current.id;
+  f.store.patchSession(id, { participants: { [U]: { id: U, name: 'User', joinedAt: 1100, durationMs: 0, consented: false, everConsented: false } } });
+  await until(() => f.store.getSession(id).notice.state === 'sent');
+  const stopping = f.c.revoke(U, f.notice()); assert.equal(f.pcm(old), false);
+  await stopping; release(); await until(() => f.c.runtimes.size === 1);
+});
+
+test('Resume queued for an observed but unaccounted member cannot erase their later durable Stop', async t => {
+  let ready; const subscriptions = [];
+  const f = await fixture(t, { consentMode: 'channel', audio: { open: () => new Promise(resolve => { ready = () => resolve({
+    setConsented: async (id, yes) => subscriptions.push([id, yes]), close: async () => {},
+  }); }) } });
+  const starting = f.start([V]); await until(() => ready);
+  const accounting = f.c.membership([member(V), member(U)]), notice = f.notice();
+  const resuming = f.c.consent(U, notice);
+  const stopping = f.c.revoke(U, notice);
+  assert.deepEqual(f.store.getAutomaticOptOuts(), [U]);
+  ready(); await starting; await accounting; assert.equal(await resuming, false); await stopping;
+  assert.deepEqual(f.store.getAutomaticOptOuts(), [U]); assert.equal(f.c.current.gates.has(U), false);
+  assert.ok(!subscriptions.some(([id, yes]) => id === U && yes));
 });
 
 test('end validates exact notice then seals acceptance synchronously ahead of queue and freezes stop-time accounting', async t => {

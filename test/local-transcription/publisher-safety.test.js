@@ -64,6 +64,29 @@ test('notice accepted after timeout/closure is still disabled when late acknowle
   await release(); await settle(); await settle();
   assert.equal(f.records.get('session-a').notice.state, 'closed'); assert.equal(f.records.get('session-a').notice.disabled, true); assert.equal(f.port.sends, 1);
 });
+test('channel late notice acceptance stays policy-correct and drain owns its pending disabled edit', async () => {
+  const f = fixture(); f.add('session-a', 'active'); f.records.get('session-a').consentMode = 'channel';
+  const original = f.port.send; let releaseSend, releaseEdit;
+  f.port.send = payload => new Promise(resolve => { releaseSend = async () => resolve(await original.call(f.port, payload)); });
+  f.port.edit = async (id, payload) => {
+    f.port.edits.push({ id, payload });
+    await new Promise(resolve => { releaseEdit = resolve; });
+  };
+  const pub = new Publisher({ store: f.store, transport: f.port, requestMs: 50 });
+  await pub.notice('session-a'); await pub.closeNotice('session-a');
+  let drained = false;
+  const draining = pub.drain().then(() => { drained = true; });
+  await releaseSend(); await settle();
+  assert.equal(drained, false);
+  const edit = f.port.edits.at(-1).payload;
+  assert.match(edit.content, /Fixed channel policy/);
+  assert.equal(edit.components[0].components[0].label, 'Resume my microphone');
+  assert.ok(edit.components[0].components.every(button => button.disabled));
+  releaseEdit(); await draining;
+  assert.equal(f.records.get('session-a').notice.state, 'closed');
+  assert.equal(f.records.get('session-a').notice.disabled, true);
+  assert.equal(f.port.sends, 1);
+});
 test('bounded history pagination can reconcile on page two without resend', async () => {
   const f = fixture(), original = f.port.send;
   f.port.send = async payload => { await original.call(f.port, payload); throw Error('lost ack'); };

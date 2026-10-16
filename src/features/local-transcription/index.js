@@ -85,6 +85,7 @@ async function voiceSnapshot(client, config, known = true) {
 // Only these fixed codes may be displayed, never an arbitrary error/string.
 const STATUS_ISSUES = new Set([
   'CORE_FAILURE', 'CORE_STORAGE_OR_LIFECYCLE_FAILED', 'FEATURE_FAILURE', 'STARTUP_FAILURE', 'GATEWAY_INTERRUPTION',
+  'AUTOMATIC_OPTOUT_FAILED',
   'CONSENT_LIMIT', 'PARTICIPANT_LIMIT', 'SESSION_LIMIT', 'QUEUE_LIMIT', 'SPOOL_LIMIT', 'JOB_RECORD_LIMIT',
   'PCM_PACKET_INVALID', 'PCM_WRITE_FAILED', 'PCM_STORAGE_FAILED', 'PCM_ACCOUNTING_MISMATCH',
   'SCHEDULER_STORE_FAILED', 'SCHEDULER_CALLBACK_FAILED', 'RECOGNITION_FAILED', 'RECOGNITION_TIMEOUT',
@@ -92,7 +93,7 @@ const STATUS_ISSUES = new Set([
   'CAPTURE_CLOSE_FAILED', 'CAPTURE_CHECKPOINT_FAILED', 'CAPTURE_EOF_UNCONFIRMED', 'AUDIO_CLOSE_TIMEOUT',
   'AUDIO_OPEN_OR_SUBSCRIBE_FAILED', 'AUDIO_UNSUBSCRIBE_FAILED', 'LATE_AUDIO_CLOSE_FAILED',
   'NOTICE_CLOSE_FAILED', 'NOTICE_FAILED_OR_UNCERTAIN', 'PUBLICATION_FAILED_OR_UNCERTAIN',
-  'SHUTDOWN_CHECKPOINT_FAILED', 'SHUTDOWN_INTERRUPTED', 'RESTART_INTERRUPTED',
+  'SHUTDOWN_CHECKPOINT_FAILED', 'SHUTDOWN_INTERRUPTED', 'RESTART_INTERRUPTED', 'AUTOMATIC_OPTOUT_FAILED',
   'AUDIO_INTERRUPTED', 'AUDIO_OPEN_FAILED', 'BOT_MOVED_OR_DEAFENED', 'CLIENT_ERROR',
   'DECODER_CLOSE_FAILED', 'DECODE_FAILED', 'DRAIN_INCOMPLETE', 'GATEWAY_DISCONNECT', 'GATEWAY_RECONNECT',
   'PACKET_QUEUE_LIMIT', 'PACKET_SIZE_LIMIT', 'PCM_FORMAT_OR_SIZE', 'PCM_HOOK_FAILED',
@@ -105,11 +106,15 @@ function statusText(status = {}, state = 'starting') {
   const bool = value => value === true ? 'yes' : value === false ? 'no' : 'unknown';
   const lifecycle = status.failed === true ? 'faulted' : status.shuttingDown === true ? 'stopping'
     : status.initialized === true ? 'running' : ['starting', 'stopping', 'stopped', 'faulted'].includes(state) ? state : 'running';
+  const policy = status.consentMode === 'channel' ? 'channel' : status.consentMode === undefined || status.consentMode === 'manual' ? 'manual' : 'unknown';
+  const paused = Number.isSafeInteger(status.automaticOptOuts) && status.automaticOptOuts >= 0 && status.automaticOptOuts <= 32 ? status.automaticOptOuts : 'unknown';
   const issue = status.issue === null ? 'none' : STATUS_ISSUES.has(status.issue) ? status.issue : status.issue === undefined ? 'unknown' : 'unrecognized (details withheld)';
   return `Local transcription: ${lifecycle}; recording: ${bool(status.recording)}; consenting: ${count(status.consenting)}; occupancy: ${count(status.occupancy)}. ` +
     `Queue: ${count(status.pendingJobs)}; draining: ${count(status.draining)}; incomplete: ${count(status.incomplete)}; held/uncertain: ${count(status.held)}. ` +
     `Hold until empty: ${bool(status.holdUntilEmpty)}; failed: ${bool(status.failed)}; issue: ${issue}. ` +
-    'Recording requires explicit consent for each account; leave, interruption, or restart revokes it. ' +
+    `Fixed consent policy: ${policy}; paused microphones: ${paused}. ` +
+    (policy === 'channel' ? 'Automatic under administrator-confirmed company standing consent, including one person. Restart/reconnect can resume only with known occupancy and no safety/End hold; personal pauses persist until resume or known empty. ' :
+      policy === 'manual' ? 'Recording requires explicit consent for each account; leave, interruption, or restart revokes it. ' : 'Consent policy unavailable; no automatic authorization is assumed. ') +
     'Held/uncertain publication requires review; transcript text is never shown in status.';
 }
 function cachedVoiceMember(client, config, userId) {
@@ -123,6 +128,9 @@ function createFeature(deps = {}) {
   let config, client, coordinator, lock, capture, timer, cleanupPromise, startupPromise;
   let state = 'starting', known = false, stopped = false, generation = 0, gatewayAvailable = true;
   let observed = new Set();
+  // Own only currently pending grants. A later Stop cancels an earlier Resume
+  // stalled on snapshot/interaction HTTP before it can call core's grant method.
+  const pendingGrants = new Map();
   const transportStop = new AbortController();
   const getConfig = () => config || (config = deps.config || loadConfig());
   const invalidateAll = () => { for (const id of observed) coordinator?.invalidate(id); };
@@ -169,42 +177,56 @@ function createFeature(deps = {}) {
     try { await operation(); } catch { await failClosed('FEATURE_FAILURE'); }
   }
   async function button(interaction, action) {
+    let grantToken;
+    const userId = interaction.user?.id;
     try {
       const cfg = getConfig();
-      if (!coordinator || stopped || !known || !gatewayAvailable || interaction.guildId !== cfg.guildId || interaction.channelId !== cfg.alertsChannelId ||
+      if (!coordinator || stopped || (action !== 'revoke' && (!known || !gatewayAvailable)) || interaction.guildId !== cfg.guildId || interaction.channelId !== cfg.alertsChannelId ||
         interaction.user?.bot || !ACCOUNT_ID.test(interaction.user?.id || '') || interaction.message?.author?.id !== client.user.id) return await deny(interaction);
       // Exact durable current notice; IDs remain static across restarts.
       const active = store.listSessions().find(session => session.phase === 'active' && session.notice?.state === 'sent' && session.notice.id === interaction.message.id);
       if (!active) return await deny(interaction);
-      let ending;
+      let cutoff;
       const epoch = generation;
       if (action === 'end') {
         // The gateway's current local voice cache is sufficient for a privacy
         // cutoff. No membership fetch or interaction HTTP may precede it.
         if (!cachedVoiceMember(client, cfg, interaction.user.id)) return await deny(interaction);
         invalidateAll();
-        ending = Promise.resolve(coordinator.end(interaction.message.id));
-        ending.catch(() => {}); // observe failures even while acknowledgement stalls
+        cutoff = Promise.resolve(coordinator.end(interaction.message.id));
+        cutoff.catch(() => {}); // observe failures even while acknowledgement stalls
+      } else if (action === 'revoke') {
+        // A present or already-accounted participant may conservatively pause
+        // their own mic without HTTP. Strangers cannot fill durable optout slots.
+        if (!active.participants?.[userId] && !cachedVoiceMember(client, cfg, userId)) return await deny(interaction);
+        pendingGrants.delete(userId);
+        // Core synchronously cuts gates AND persists standing-policy suppression.
+        // Exact notice/account authorization above needs no later snapshot HTTP.
+        cutoff = Promise.resolve(coordinator.revoke(userId, interaction.message.id));
+        cutoff.catch(() => {}); // acknowledgement may hang or fail independently
       } else {
-        // Conservative removal grants nothing: stop this authenticated account's
-        // gate before membership/acknowledgement HTTP can delay its privacy choice.
-        if (action === 'revoke') coordinator.invalidate(interaction.user.id);
+        if (!pendingGrants.has(userId) && pendingGrants.size >= 32) return await deny(interaction);
+        grantToken = Symbol(); pendingGrants.set(userId, grantToken);
         const members = await snapshot();
         if (generation !== epoch || !members || members.length > 32 || !members.some(member => member.id === interaction.user.id)) return await deny(interaction);
       }
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-      if (action !== 'end' && (stopped || !known || !gatewayAvailable || generation !== epoch)) {
+      if (!cutoff && (stopped || !known || !gatewayAvailable || generation !== epoch ||
+        pendingGrants.get(userId) !== grantToken)) {
         await interaction.editReply({ content: 'Voice membership changed; no new consent was assumed. Try the current notice again.' });
         return;
       }
-      const accepted = ending ? await ending : await coordinator[action](interaction.user.id, interaction.message.id);
+      const accepted = cutoff ? await cutoff : await coordinator.consent(userId, interaction.message.id);
       if (accepted === false) {
         await interaction.editReply({ content: 'Local transcription action was not accepted. No new consent was assumed; recording may be unavailable or at its safety limit.' });
         return;
       }
-      await interaction.editReply({ content: action === 'consent' ? 'Consent recorded for your account only. Shared microphone: obtain permission from everyone audible; otherwise stop your microphone.' : action === 'revoke' ? 'Your microphone consent has been revoked.' : 'Session capture ended. A known empty channel is required before a new session.' });
+      const channelPolicy = active.consentMode === 'channel';
+      await interaction.editReply({ content: action === 'consent' ? (channelPolicy ? 'Your microphone resumed under company standing consent. Shared microphone: ensure everyone audible has consented; otherwise stop your microphone.' : 'Consent recorded for your account only. Shared microphone: obtain permission from everyone audible; otherwise stop your microphone.') : action === 'revoke' ? (channelPolicy ? 'Your microphone is paused until you explicitly resume on the current notice or the channel is known empty.' : 'Your microphone consent has been revoked.') : 'Session capture ended. A known empty channel is required before a new session.' });
     } catch {
       try { if (interaction.deferred) await interaction.editReply({ content: 'Local transcription action unavailable. No consent was assumed.' }); else await deny(interaction); } catch {}
+    } finally {
+      if (grantToken && pendingGrants.get(userId) === grantToken) pendingGrants.delete(userId);
     }
   }
   async function deny(interaction) {
@@ -219,7 +241,7 @@ function createFeature(deps = {}) {
       async execute(interaction) {
         try {
           if (interaction.guildId !== getConfig().guildId || interaction.user?.bot) return;
-          await interaction.reply({ content: statusText(coordinator?.status(), state), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
+          await interaction.reply({ content: statusText(coordinator?.status() || { consentMode: getConfig().consentMode }, state), flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
         } catch { /* No private error escapes to the global logger. */ }
       } }],
     events: [
@@ -267,7 +289,7 @@ function createFeature(deps = {}) {
           return handle;
         } };
         const publisher = new Publisher({ store, transport: createTransport(client, cfg, transportStop.signal), allowAttachments: cfg.allowAttachments });
-        coordinator = new Coordinator({ store, audio: audioPort, recognize, publisher, limits: cfg.limits });
+        coordinator = new Coordinator({ store, audio: audioPort, recognize, publisher, limits: cfg.limits, consentMode: cfg.consentMode });
         const recoveryGeneration = generation;
         await coordinator.init(); // Recovery MUST precede current room membership.
         if (stopped || !lock.acquired) return;

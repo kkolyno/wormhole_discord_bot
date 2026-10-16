@@ -20,7 +20,13 @@ A durable meeting-transcription mode is now implemented on the feature branch,
 **off by default and not published/deployed**. Read
 [`docs/LOCAL_TRANSCRIPTION.md`](docs/LOCAL_TRANSCRIPTION.md) and
 [`docs/LOCAL_TRANSCRIPTION_RESULTS.md`](docs/LOCAL_TRANSCRIPTION_RESULTS.md) before
-any activation. Long `.txt` attachments are still unapproved/off. The one-shot
+any activation. The user clarified that all employees in the private company
+channel have standing consent: the intended setting is
+`LOCAL_TRANSCRIPTION_CONSENT_MODE=channel` with the feature enabled. This starts
+for one human without per-meeting clicks; `manual` remains the compatibility
+default. Apply administrator setting changes by restart/recreate, not hot reload.
+See `docs/STANDING_CONSENT_RESULTS.md`; this automation has not yet been deployed.
+Long `.txt` attachments are still unapproved/off. The one-shot
 administration helper deliberately does not activate the new mode; it needs a
 separately reviewed immutable-image/volume/stop-grace/rollback procedure. Do not
 reuse a completed activation job, pull `latest`, or erase a one-shot marker.

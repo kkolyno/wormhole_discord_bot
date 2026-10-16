@@ -26,12 +26,20 @@ function offset(ms) {
   const s = Math.floor(ms / 1000);
   return `${Math.floor(s / 3600).toString().padStart(2, '0')}:${Math.floor(s % 3600 / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 }
-function buttons(disabled = false) {
-  return [{ type: 1, components: ACTIONS.map(([custom_id, label, style]) => ({ type: 2, custom_id, label, style, disabled })) }];
+function sessionPolicy(session) {
+  const mode = session.consentMode === undefined ? 'manual' : session.consentMode;
+  check(mode === 'manual' || mode === 'channel', 'INVALID_CONSENT_MODE');
+  return mode;
+}
+function buttons(disabled = false, consentMode = 'manual') {
+  check(consentMode === 'manual' || consentMode === 'channel', 'INVALID_CONSENT_MODE');
+  return [{ type: 1, components: ACTIONS.map(([custom_id, label, style]) => ({ type: 2, custom_id,
+    label: consentMode === 'channel' && custom_id === 'local_transcription_consent' ? 'Resume my microphone' : label, style, disabled })) }];
 }
 function validateSession(session) {
   check(session?.schema === 1 && ID.test(session.id), 'INVALID_FINAL_SESSION');
   check(Number.isFinite(session.startedAt), 'INVALID_FINAL_SESSION');
+  sessionPolicy(session);
   check(session.participants && typeof session.participants === 'object' && !Array.isArray(session.participants), 'INVALID_PARTICIPANTS');
   const participants = Object.values(session.participants);
   check(participants.length <= 32, 'PARTICIPANT_OUTPUT_LIMIT');
@@ -44,6 +52,7 @@ function issueCode(code) { return typeof code === 'string' && /^[A-Z0-9_]{1,80}$
 function finalPayload(session, jobs, { allowAttachments = false, inlineLimit = 1900, maxTranscriptBytes = 4 * 1024 * 1024 } = {}) {
   check(typeof allowAttachments === 'boolean', 'INVALID_ATTACHMENT_APPROVAL');
   const participants = validateSession(session);
+  const channelPolicy = sessionPolicy(session) === 'channel';
   check(['ready', 'published'].includes(session.phase) && Number.isFinite(session.endedAt) && session.endedAt >= session.startedAt, 'TRANSCRIPTION_NOT_READY');
   check(Array.isArray(jobs), 'INVALID_FINAL_JOBS');
   check(jobs.length <= 32768, 'JOB_OUTPUT_LIMIT');
@@ -75,7 +84,7 @@ function finalPayload(session, jobs, { allowAttachments = false, inlineLimit = 1
   const consented = participants.filter(p => p.everConsented).length;
   if (consented && bytes === 0) issues.add('NO_AUDIO_OBSERVED');
   const issueList = [...issues].sort();
-  const status = issues.size ? 'INCOMPLETE' : consented ? 'Accepted audio processed' : 'Not recorded (no consent)';
+  const status = issues.size ? 'INCOMPLETE' : consented ? 'Accepted audio processed' : channelPolicy ? 'Not recorded (no authorized audio)' : 'Not recorded (no consent)';
   let content = `📊 **Meeting Summary**\n**Status:** ${status}\n`;
   content += `**Call duration:** ${duration(session.endedAt - session.startedAt)}\n`;
   content += `**Participants and duration:**\n`;
@@ -83,11 +92,13 @@ function finalPayload(session, jobs, { allowAttachments = false, inlineLimit = 1
     content += `• <@${p.id}>: ${duration(p.durationMs)}\n`;
   }
   if (!participants.length) content += '[No tracked participants.]\n';
-  content += `\n**Recording coverage:** ${consented}/${participants.length} account(s) consented at least once. Only consented windows are transcribed.\n`;
+  content += channelPolicy ? `\n**Recording coverage:** ${consented}/${participants.length} account(s) authorized at least once under administrator-confirmed company standing consent (channel policy). Only authorized, unpaused windows are transcribed; no per-meeting click is required.\n` :
+    `\n**Recording coverage:** ${consented}/${participants.length} account(s) consented at least once. Only consented windows are transcribed.\n`;
   content += 'Local English recognition; upstream loss is unknown. Packet gaps are not reconstructed silence.\n';
   if (issueList.length) content += `**Issues:** ${issueList.length}; details in the transcript.\n`;
   let transcript = issueList.length ? `INCOMPLETE — ${issueList.join(', ')}\n\n` : '';
-  transcript += lines.join('\n') || (consented ? '[No audio observed from consenting accounts.]' : '[No recording: no participants consented.]');
+  transcript += lines.join('\n') || (channelPolicy ? (consented ? '[No audio observed from authorized accounts.]' : '[No recording: no participants authorized.]') :
+    (consented ? '[No audio observed from consenting accounts.]' : '[No recording: no participants consented.]'));
   check(Buffer.byteLength(transcript) <= maxTranscriptBytes, 'TRANSCRIPT_OUTPUT_LIMIT');
   const inline = content + '\n**Transcript:**\n```text\n' + transcript + '\n```';
   // Reserve space for immutable reconciliation marker; do not split/flood posts.
@@ -167,7 +178,14 @@ class Publisher {
       }
       if (prior.state === 'sent') return prior;
       const payload = {
-        content: '**Local meeting transcription — consent required**\n' +
+        content: sessionPolicy(s) === 'channel' ? '**Local meeting transcription — automatic company consent**\n' +
+          'The administrator confirms standing company consent for ALL humans admitted here, including guests and anyone audible through shared microphones. Recording starts automatically with one person in the configured voice channel; no button or notice acknowledgement is required. ' +
+          'Known occupants can be recorded on startup/restart and gateway reconnect. Unknown occupancy pauses capture. End, safety/overload faults and the configured maximum (at most 4 hours) stop automatic capture; they are not bypassed. ' +
+          '**Stop my microphone** pauses your account across leave/rejoin and restart until you use **Resume my microphone** on this current notice while present, or the channel is known empty. **End recording** stops everyone until known empty. ' +
+          'Presence/duration metadata is tracked for all participants. Only authorized, unpaused audio is transcribed. Ensure everyone audible has consented; otherwise stop your mic.\n\n' +
+          'Local English recognition runs during the call; a final duration summary and transcript follow completed processing. Discord transports voice and retains posts; no extra STT provider receives audio. Private audio is deleted after processing/recovery. Normal local transcript/metadata retention is 24 hours after session end; outages can delay cleanup. Personal pause account IDs persist until resume/known empty, beyond that retention. ' +
+          'Gaps/overload are incomplete, not silently complete; long output requires approved delivery. Known empty closes after the configured grace. Buttons remain usable while active.' :
+          '**Local meeting transcription — consent required**\n' +
           'Only an account that clicks **I consent: record my mic** while in the configured voice channel is subscribed/recorded. Joining alone is NOT consent. Presence/duration metadata is tracked for all participants. ' +
           'Consent ends when you leave, revoke it, the connection is interrupted, or the bot restarts. Rejoining requires fresh consent. ' +
           '**Stop my microphone** revokes your consent; **End recording** stops this session for everyone. Obtain consent from anyone audible through a shared microphone.\n\n' +
@@ -176,7 +194,7 @@ class Publisher {
           'Private audio is kept while processing/recovery is pending, then deleted. Normal local transcript/metadata retention is 24 hours after the session ends; crashes or unavailable storage can delay cleanup. ' +
           'Overload/outages are reported as incomplete, not silently complete. Long output follows the configured delivery policy.\n' +
           'The session closes after the channel is empty for the configured grace period. These buttons do not expire while the meeting remains active.',
-        components: buttons(), allowedMentions: { parse: [] },
+        components: buttons(false, sessionPolicy(s)), allowedMentions: { parse: [] },
       };
       return this.deliver(s, 'notice', 'notice', payload, prior);
     });
@@ -191,9 +209,10 @@ class Publisher {
       const content = '**Local recording for this session has stopped.**\n' +
         `Reason: ${reason}. No additional microphone audio is being accepted for this session.\n` +
         'This is a recording-status notice, not the final meeting summary. Accepted work must finish or be explicitly accounted for before the final summary is published. ' +
-        'Use `/transcription-status` for draining, incomplete, or held-publication status. A new session needs fresh consent.\n' +
+        'Use `/transcription-status` for draining, incomplete, or held-publication status. ' +
+        (sessionPolicy(session) === 'channel' ? 'Fixed channel policy: known occupants may record automatically on restart/reconnect, but never through personal pauses, End or safety holds. A known empty channel clears End/personal pauses; safety stops require review.\n' : 'A new session needs fresh consent.\n') +
         (closed.marker ? `Ref: ${closed.marker}` : `Session: ${sessionId}`);
-      try { await this.bounded(() => this.transport.edit(closed.id, { content, components: buttons(true), allowedMentions: { parse: [] } })); disabled = true; }
+      try { await this.bounded(() => this.transport.edit(closed.id, { content, components: buttons(true, sessionPolicy(session)), allowedMentions: { parse: [] } })); disabled = true; }
       catch { /* Exact active-session checks also reject stale enabled buttons. */ }
     }
     const latest = this.store.getSession(sessionId).notice;

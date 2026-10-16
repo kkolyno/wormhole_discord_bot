@@ -7,8 +7,8 @@ const { createFeature, voiceSnapshot, createTransport, statusText } = require('.
 const { loadConfig } = require('../../src/features/local-transcription/config');
 const ids = { guild: '111111111111111111', voice: '222222222222222222', alerts: '333333333333333333', human: '444444444444444444', bot: '555555555555555555', notice: '666666666666666666' };
 const cfg = loadConfig({ GUILD_ID: ids.guild, VOICE_CHANNEL_ID: ids.voice, ALERTS_CHANNEL_ID: ids.alerts, LOCAL_TRANSCRIPTION_DATA_DIR: '/tmp/transcription-fake' });
-function harness(t, { lockAcquire = async () => {} } = {}) {
-  const calls = [], notices = [{ phase: 'active', notice: { state: 'sent', id: ids.notice } }];
+function harness(t, { lockAcquire = async () => {}, config = cfg } = {}) {
+  const calls = [], notices = [{ phase: 'active', consentMode: config.consentMode, notice: { state: 'sent', id: ids.notice } }];
   const channel = { guild: { id: ids.guild }, isVoiceBased: () => true, members: new Map([[ids.human, { id: ids.human, displayName: 'Synthetic', user: { bot: false } }]]) };
   const guild = { available: true, channels: { cache: new Map([[ids.voice, channel]]), fetch: async () => channel } };
   const client = { user: { id: ids.bot }, rest: { options: {} }, guilds: { cache: new Map([[ids.guild, guild]]), fetch: async () => guild } };
@@ -32,14 +32,14 @@ function harness(t, { lockAcquire = async () => {} } = {}) {
     async fault(code) { calls.push(['fault', code]); }
     async tick() {}
     async shutdown() { calls.push('shutdown'); }
-    status() { return { initialized: true, recording: false, consenting: 0, occupancy: 1, pendingJobs: 2, draining: 0, incomplete: 0, held: 0, holdUntilEmpty: false, failed: false, issue: null, text: 'PRIVATE TEXT' }; }
+    status() { return { consentMode: this.options.consentMode, automaticOptOuts: 0, initialized: true, recording: false, consenting: 0, occupancy: 1, pendingJobs: 2, draining: 0, incomplete: 0, held: 0, holdUntilEmpty: false, failed: false, issue: null, text: 'PRIVATE TEXT' }; }
   }
-  const feature = createFeature({ config: cfg, Store, Audio, Publisher, Coordinator, WriterLock: Lock, recognize: async () => '' });
+  const feature = createFeature({ config, Store, Audio, Publisher, Coordinator, WriterLock: Lock, recognize: async () => '' });
   t.after(() => feature.cleanup());
   const event = name => feature.events.find(event => event.name === name).execute;
   const interaction = extra => ({ guildId: ids.guild, channelId: ids.alerts, user: { id: ids.human, bot: false }, message: { id: ids.notice, author: { id: ids.bot } },
     async reply(payload) { calls.push(['reply', payload]); }, async deferReply() { this.deferred = true; calls.push('defer'); }, async editReply(payload) { calls.push(['edit', payload]); }, ...extra });
-  return { feature, calls, channel, client, interaction, event, get lock() { return lock; }, get coord() { return coord; } };
+  return { feature, calls, channel, client, interaction, event, notices, get lock() { return lock; }, get coord() { return coord; } };
 }
 test('root strictly selects one owner and does not eagerly load legacy', () => {
   const source = fs.readFileSync(require.resolve('../../index.js'), 'utf8');
@@ -72,6 +72,7 @@ test('lock precedes recovery; recovery precedes membership; attachments stay una
   assert.ok(h.calls.indexOf('lock') < h.calls.indexOf('recover'));
   assert.ok(h.calls.indexOf('recover') < h.calls.findIndex(call => call[0] === 'membership'));
   assert.deepEqual(h.calls.find(call => call[0] === 'publisher'), ['publisher', false]);
+  assert.equal(h.coord.options.consentMode, 'manual');
   assert.equal(h.client.rest.options.retries, 0);
 });
 test('shutdown during startup cannot create a store/coordinator after releasing the lock', async t => {
@@ -100,16 +101,82 @@ test('leave immediately invalidates before blocked snapshot, revoke before ackno
   const promise = h.event(Events.VoiceStateUpdate)({ id: ids.human, channelId: ids.voice, guild: { id: ids.guild } }, { id: ids.human, channelId: null, guild: { id: ids.guild } });
   assert.deepEqual(h.calls[before], ['invalidate', ids.human]); await promise;
   await h.feature.buttonHandlers.local_transcription_revoke(h.interaction());
-  const defer = h.calls.lastIndexOf('defer'); assert.deepEqual(h.calls[defer - 1], ['invalidate', ids.human]);
+  const defer = h.calls.lastIndexOf('defer'); assert.deepEqual(h.calls[defer - 1], ['revoke', ids.human, ids.notice]);
 });
-test('authenticated revoke removes the gate before even a stalled membership request', async t => {
-  const h = harness(t); await h.feature.onStartup(h.client);
-  let release;
-  h.client.guilds.fetch = () => new Promise(resolve => { release = resolve; });
+test('authenticated revoke calls durable core suppression before acknowledgement without any membership HTTP', async t => {
+  const h = harness(t, { config: { ...cfg, consentMode: 'channel' } }); await h.feature.onStartup(h.client);
+  assert.equal(h.coord.options.consentMode, 'channel');
+  let fetches = 0, acknowledge;
+  h.client.guilds.fetch = () => { fetches++; return new Promise(() => {}); };
   const before = h.calls.length;
-  const action = h.feature.buttonHandlers.local_transcription_revoke(h.interaction());
-  assert.deepEqual(h.calls[before], ['invalidate', ids.human]);
-  release(null); await action;
+  const action = h.feature.buttonHandlers.local_transcription_revoke(h.interaction({
+    deferReply() { h.calls.push('defer'); return new Promise(resolve => { acknowledge = resolve; }); },
+  }));
+  assert.deepEqual(h.calls.slice(before), [['revoke', ids.human, ids.notice], 'defer']);
+  assert.equal(fetches, 0);
+  acknowledge(); await action;
+  assert.match(h.calls.at(-1)[1].content, /paused until/);
+});
+test('Stop is authorized only by the exact current bot-owned notice, guild, channel and human account', async t => {
+  const h = harness(t); await h.feature.onStartup(h.client);
+  for (const extra of [{ guildId: ids.voice }, { channelId: ids.voice }, { user: { id: ids.human, bot: true } },
+    { user: { id: 'private', bot: false } }, { message: { id: ids.notice, author: { id: ids.human } } },
+    { message: { id: '777777777777777777', author: { id: ids.bot } } }]) {
+    await h.feature.buttonHandlers.local_transcription_revoke(h.interaction(extra));
+  }
+  assert.equal(h.calls.filter(call => call[0] === 'revoke').length, 0);
+  // Unknown occupancy cannot prevent an authenticated account from stopping itself.
+  await h.event(Events.ShardDisconnect)();
+  await h.feature.buttonHandlers.local_transcription_revoke(h.interaction());
+  assert.equal(h.calls.filter(call => call[0] === 'revoke').length, 1);
+});
+test('strangers cannot consume durable pause slots, but an accounted participant may Stop after leaving without HTTP', async t => {
+  const h = harness(t); await h.feature.onStartup(h.client);
+  await h.feature.buttonHandlers.local_transcription_revoke(h.interaction({ user: { id: '777777777777777777', bot: false } }));
+  assert.equal(h.calls.filter(call => call[0] === 'revoke').length, 0);
+  h.notices[0].participants = { [ids.human]: { id: ids.human } };
+  h.channel.members.delete(ids.human);
+  h.client.guilds.fetch = () => { throw Error('Stop must not use HTTP'); };
+  await h.feature.buttonHandlers.local_transcription_revoke(h.interaction());
+  assert.equal(h.calls.filter(call => call[0] === 'revoke').length, 1);
+});
+test('a rejected revoke promise is observed even while acknowledgement is stalled', async t => {
+  const h = harness(t); await h.feature.onStartup(h.client);
+  h.coord.revoke = () => Promise.reject(Error('PRIVATE'));
+  let acknowledge;
+  const action = h.feature.buttonHandlers.local_transcription_revoke(h.interaction({
+    deferReply() { this.deferred = true; return new Promise(resolve => { acknowledge = resolve; }); },
+  }));
+  await new Promise(resolve => setImmediate(resolve)); // unhandled rejection would fail this test
+  acknowledge(); await action;
+  assert.doesNotMatch(JSON.stringify(h.calls), /PRIVATE/);
+});
+for (const waitAt of ['snapshot', 'acknowledgement']) test(`later Stop cancels an earlier Resume stalled at ${waitAt}`, async t => {
+  const h = harness(t, { config: { ...cfg, consentMode: 'channel' } }); await h.feature.onStartup(h.client);
+  let release;
+  const fetch = h.client.guilds.fetch;
+  const resumeInteraction = h.interaction(waitAt === 'acknowledgement' ? {
+    deferReply() { this.deferred = true; return new Promise(resolve => { release = resolve; }); },
+  } : {});
+  if (waitAt === 'snapshot') h.client.guilds.fetch = () => new Promise(resolve => { release = async () => resolve(await fetch()); });
+  const resume = h.feature.buttonHandlers.local_transcription_consent(resumeInteraction);
+  await new Promise(resolve => setImmediate(resolve));
+  await h.feature.buttonHandlers.local_transcription_revoke(h.interaction());
+  await release(); await resume;
+  assert.equal(h.calls.filter(call => call[0] === 'consent').length, 0);
+  assert.equal(h.calls.filter(call => call[0] === 'revoke').length, 1);
+});
+test('channel Resume requires known current presence and uses existing consent ID without claiming a consent click', async t => {
+  const h = harness(t, { config: { ...cfg, consentMode: 'channel' } }); await h.feature.onStartup(h.client);
+  const resume = h.feature.buttonHandlers.local_transcription_consent;
+  await resume(h.interaction());
+  assert.match(h.calls.at(-1)[1].content, /resumed under company standing consent/);
+  assert.doesNotMatch(h.calls.at(-1)[1].content, /Consent recorded/);
+  h.channel.members.clear(); await resume(h.interaction());
+  assert.equal(h.calls.filter(call => call[0] === 'consent').length, 1);
+  h.channel.members.set(ids.human, { id: ids.human, user: { bot: false } });
+  await h.event(Events.ShardDisconnect)(); await resume(h.interaction());
+  assert.equal(h.calls.filter(call => call[0] === 'consent').length, 1);
 });
 test('membership changes during consent acknowledgement cannot restore consent', async t => {
   const h = harness(t); await h.feature.onStartup(h.client);
@@ -234,16 +301,30 @@ test('grant consent still waits for a fresh known membership snapshot', async t 
 });
 test('status renders the real coordinator fields, with numeric incomplete and no invented publication state', () => {
   const status = { initialized: true, recording: true, consenting: 2, occupancy: 3, pendingJobs: 4, draining: 5,
-    incomplete: 6, held: 7, holdUntilEmpty: true, failed: false, issue: 'CONSENT_LIMIT', text: 'PRIVATE', error: 'PRIVATE' };
+    incomplete: 6, held: 7, holdUntilEmpty: true, failed: false, issue: 'CONSENT_LIMIT', consentMode: 'manual', automaticOptOuts: 0, text: 'PRIVATE', error: 'PRIVATE' };
   const output = statusText(status, 'idle');
   assert.ok(output.length < 1000); assert.doesNotMatch(output, /PRIVATE|idle|publication: unknown/);
   for (const expected of ['recording: yes', 'consenting: 2', 'occupancy: 3', 'Queue: 4', 'draining: 5',
-    'incomplete: 6', 'held/uncertain: 7', 'Hold until empty: yes', 'failed: no', 'issue: CONSENT_LIMIT']) assert.ok(output.includes(expected), expected);
+    'incomplete: 6', 'held/uncertain: 7', 'Hold until empty: yes', 'failed: no', 'issue: CONSENT_LIMIT', 'Fixed consent policy: manual', 'paused microphones: 0']) assert.ok(output.includes(expected), expected);
   const empty = statusText({ ...status, recording: false, consenting: 0, occupancy: 'unknown', pendingJobs: 0,
     draining: 0, incomplete: 0, held: 0, holdUntilEmpty: false, failed: true, issue: null });
   for (const expected of ['faulted', 'recording: no', 'consenting: 0', 'occupancy: unknown', 'incomplete: 0', 'held/uncertain: 0', 'Hold until empty: no', 'failed: yes', 'issue: none']) assert.ok(empty.includes(expected), expected);
   const hostile = statusText({ recording: 'PRIVATE', occupancy: 'PRIVATE', issue: 'PRIVATE', pendingJobs: 'PRIVATE', phase: 'PRIVATE', publication: { state: 'PRIVATE' } }, 'PRIVATE');
   assert.doesNotMatch(hostile, /PRIVATE/); assert.match(hostile, /details withheld/);
+});
+test('channel status uses actual fixed policy and bounded optout count, never identifiers or click claims', () => {
+  const output = statusText({ initialized: true, consentMode: 'channel', automaticOptOuts: 3 });
+  assert.match(output, /Fixed consent policy: channel; paused microphones: 3/);
+  assert.match(output, /Automatic under administrator-confirmed company standing consent/);
+  assert.match(output, /safety\/End hold/);
+  assert.doesNotMatch(output, /requires explicit consent|restart revokes/);
+  for (const value of [-1, 33, ids.human, [ids.human], NaN]) {
+    const hostile = statusText({ consentMode: 'channel', automaticOptOuts: value });
+    assert.match(hostile, /paused microphones: unknown/);
+    assert.doesNotMatch(hostile, new RegExp(ids.human));
+  }
+  assert.match(statusText({}), /Fixed consent policy: manual/);
+  assert.doesNotMatch(statusText({ consentMode: 'PRIVATE' }), /PRIVATE/);
 });
 test('REST transport is bounded, no retries/pings, handles files, and sanitizes errors', async () => {
   const calls = [], client = { user: { id: ids.bot }, rest: { options: {}, async post(route, options) { calls.push(options); return { id: ids.notice }; }, async get(route, options) { calls.push(options); return []; }, async patch() { throw Error('PRIVATE TOKEN'); } } };
